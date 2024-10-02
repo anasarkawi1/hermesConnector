@@ -14,7 +14,11 @@ from .connector_binance import Binance
 class Connector:
     # Exchange selector
     # According to the exchange value given, the correct connector sub-library will be inherited and will be made available. The client is authorised through the credentials given through the credentials library which is checked for validity before a connection is attempted.
-    def exchangeSelect(self, exchange, credentials, options):
+    def exchangeSelect(
+            self,
+            exchange,
+            credentials,
+            options):
         exchangeInstance = None
         match exchange:
             case "binance":

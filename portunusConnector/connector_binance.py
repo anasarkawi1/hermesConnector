@@ -29,7 +29,15 @@ def spotMode(credentials, baseURL):
         return Spot(api_key=credentials[0], api_secret=credentials[1], base_url=baseURL)
 
 class Binance:
-    def __init__(self, mode='live', tradingPair=None, interval=None, limit=75, credentials=["", ""], columns=None, wshandler=None):
+    def __init__(
+            self,
+            mode='live',
+            tradingPair=None,
+            interval=None,
+            limit=75,
+            credentials=["", ""],
+            columns=None,
+            wshandler=None):
         if mode == 'live':
             baseURL = 'https://api.binance.com'
             baseWsURL = 'wss://stream.binance.com:9443'
