@@ -1,5 +1,5 @@
 # Import packages
-from portunusConnector import Connector
+from hermesConnector import Connector
 
 
 # Workaround for asyncio supression of KeyboardInterrupt on Windows.

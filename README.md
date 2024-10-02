@@ -1,6 +1,6 @@
 # Portunus Connector
 
-The Portunus Connector package aims to create an abstraction layer between popular exchanges or brokers and quantitative finance scripts.
+The Hermes Connector package aims to create an abstraction layer between popular exchanges or brokers and quantitative finance scripts.
 
 By defining standardised functions and return values that run and interpret the endpoints and routines of differnt APIs, it provides agnosticity for quantitative finance scripts, allowing the developer to quickly and seamlessly test and run their analyses across variety of platforms.
 

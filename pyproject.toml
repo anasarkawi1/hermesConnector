@@ -3,8 +3,8 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "portunusConnector"
-version = "0.0.1b003"
+name = "hermesConnector"
+version = "0.0.1"
 dependencies = [
     "numpy",
     "pandas",
