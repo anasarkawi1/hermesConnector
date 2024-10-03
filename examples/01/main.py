@@ -7,9 +7,11 @@ import signal
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 
+# CREDNTIALS!!!
+credentials = ['', '']
+
 # Configuration
 exchangeName = 'binance'
-credentials = ['', '']
 mode = 'live'
 tradingPair = 'ETHUSDT'
 interval = '1h'
@@ -29,6 +31,8 @@ exchange = Connector(
     }).exchange
 
 
-a = exchange.account()
+acc = exchange.account()
 
-print(a)
+print(acc)
+
+exit()

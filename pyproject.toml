@@ -5,9 +5,32 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "hermesConnector"
 version = "0.0.1"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    { name="Anas Arkawi" }
+]
+description = "An abstraction library for different exchanges or brokers to provide platform agnosticism."
+requires-python = ">=3.11"
 dependencies = [
     "numpy",
     "pandas",
     "binance-connector",
     "dataclasses"
 ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering",
+    "Development Status :: 4 - Beta"
+]
+
+[project.urls]
+Homepage = "https://github.com/anasarkawi1/hermesConnector"
+Issues = "https://github.com/anasarkawi1/hermesConnector/issues"

@@ -1,4 +1,4 @@
-# Portunus Connector
+# Hermes Connector
 
 The Hermes Connector package aims to create an abstraction layer between popular exchanges or brokers and quantitative finance scripts.
 
