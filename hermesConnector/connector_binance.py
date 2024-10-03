@@ -47,8 +47,9 @@ class Binance:
         # Connect the spot and websocket clients
         self.clients = {
             "spot": spotMode(credentials=credentials, baseURL=baseURL),
-            "ws": WebSocketClient(on_message=self.wsHandlerInternal, stream_url=baseWsURL),
         }
+        if wshandler != None:
+            self.clients["ws"] = WebSocketClient(on_message=self.wsHandlerInternal, stream_url=baseWsURL)
         self.options = {
             "tradingPair": tradingPair,
             "interval": interval,
