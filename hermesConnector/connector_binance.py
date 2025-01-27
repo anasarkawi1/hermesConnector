@@ -145,6 +145,15 @@ class Binance:
         result = self.clients["spot"].new_order(symbol=self.options["tradingPair"], side="SELL", type="MARKET", quantity=quantity)
         return result
     
+    # Entry cost based market orders
+    def costBuy(self, cost: float):
+        result = self.clients["spot"].new_order(symbol=self.options["tradingPair"], side="BUY", type="MARKET", quoteOrderQuantity=cost)
+        return result
+
+    def costSell(self, cost: float):
+        result = self.clients["spot"].new_order(symbol=self.options["tradingPair"], side="SELL", type="MARKET", quoteOrderQuantity=cost)
+        return result
+    
     # Limit order functions
     def buyLimit(self, quantity, price):
         result = self.clients["spot"].new_order(
