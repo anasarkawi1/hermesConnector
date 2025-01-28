@@ -148,19 +148,18 @@ class Binance:
         # Check for errors and raise the Hermes erro
         match errCode:
             case -1010:
-                raise self.rejectedOrderExceptionRaise(errMsg)
+                raise self.rejectedOrderExceptionMatcher(errMsg)
             case -2010:
-                raise self.rejectedOrderExceptionRaise(errMsg)
+                raise self.rejectedOrderExceptionMatcher(errMsg)
             case -2011:
-                raise self.rejectedOrderExceptionRaise(errMsg)
+                raise self.rejectedOrderExceptionMatcher(errMsg)
             case _:
                 raise UnknownGenericHermesException
 
     # Market order functions
     def buy(self, quantity):
-        result = self.clients["spot"].new_order(symbol=self.options["tradingPair"], side="BUY", type="MARKET", quantity=quantity)
         try:
-            self.orderRequestResultHandler(result)
+            result = self.clients["spot"].new_order(symbol=self.options["tradingPair"], side="BUY", type="MARKET", quantity=quantity)
             # Step 2: If no errors were detected, construct a generalised Hermes response
             # TODO: Since only the abstractions for Binance is implemented, the API is still not clear. Standardised output is yet to be implemented, return raw result.
             return result
