@@ -5,6 +5,7 @@
 # Import libraries
 from binance.spot import Spot
 from binance.websocket.spot.websocket_stream import SpotWebsocketStreamClient as WebSocketClient
+from binance.error import ClientError as BinanceClientError
 import pandas as pd
 from pandas import DataFrame, concat
 import numpy as np
@@ -143,20 +144,17 @@ class Binance:
             case _:
                 return GenericOrderError
         
-    def orderRequestResultHandler(self, result):
-        # Check for errors and raise the Hermes error
-        if ("code" in result) and ("msg" in result):
-            errCode  = int(result["code"])
-            errMsg   = result["msg"]
-            match errCode:
-                case -1010:
-                    raise self.rejectedOrderExceptionRaise(errMsg)
-                case -2010:
-                    raise self.rejectedOrderExceptionRaise(errMsg)
-                case -2011:
-                    raise self.rejectedOrderExceptionRaise(errMsg)
-                case _:
-                    raise UnknownGenericHermesException
+    def orderRequestResultHandler(self, errCode, errMsg):
+        # Check for errors and raise the Hermes erro
+        match errCode:
+            case -1010:
+                raise self.rejectedOrderExceptionRaise(errMsg)
+            case -2010:
+                raise self.rejectedOrderExceptionRaise(errMsg)
+            case -2011:
+                raise self.rejectedOrderExceptionRaise(errMsg)
+            case _:
+                raise UnknownGenericHermesException
 
     # Market order functions
     def buy(self, quantity):
@@ -166,68 +164,63 @@ class Binance:
             # Step 2: If no errors were detected, construct a generalised Hermes response
             # TODO: Since only the abstractions for Binance is implemented, the API is still not clear. Standardised output is yet to be implemented, return raw result.
             return result
-        except HermesBaseException as err:
-            raise err
+        except BinanceClientError as err:
+            self.orderRequestResultHandler(err.error_code, err.error_message)
 
     
     def sell(self, quantity):
-        result = self.clients["spot"].new_order(symbol=self.options["tradingPair"], side="SELL", type="MARKET", quantity=quantity)
         try:
-            self.orderRequestResultHandler(result)
-            # Step 2: If no errors were detected, construct a generalised Hermes response
-            # TODO: Since only the abstractions for Binance is implemented, the API is still not clear. Standardised output is yet to be implemented, return raw result.
+            result = self.clients["spot"].new_order(symbol=self.options["tradingPair"], side="SELL", type="MARKET", quantity=quantity)
             return result
-        except HermesBaseException as err:
-            raise err
+        except BinanceClientError as err:
+            self.orderRequestResultHandler(err.error_code, err.error_message)
     
     # Entry cost based market orders
     def costBuy(self, cost: float):
-        result = self.clients["spot"].new_order(symbol=self.options["tradingPair"], side="BUY", type="MARKET", quoteOrderQty=cost)
         try:
-            self.orderRequestResultHandler(result)
-            # Step 2: If no errors were detected, construct a generalised Hermes response
-            # TODO: Since only the abstractions for Binance is implemented, the API is still not clear. Standardised output is yet to be implemented, return raw result.
+            result = self.clients["spot"].new_order(symbol=self.options["tradingPair"], side="BUY", type="MARKET", quoteOrderQty=cost)
             return result
-        except HermesBaseException as err:
-            raise err
+        except BinanceClientError as err:
+            self.orderRequestResultHandler(err.error_code, err.error_message)
 
     def costSell(self, cost: float):
-        result = self.clients["spot"].new_order(symbol=self.options["tradingPair"], side="SELL", type="MARKET", quoteOrderQty=cost)
+        try:
+            result = self.clients["spot"].new_order(symbol=self.options["tradingPair"], side="SELL", type="MARKET", quoteOrderQty=cost)
+        except BinanceClientError as err:
+            self.orderRequestResultHandler(err.error_code, err.error_message)
         return result
     
     # Limit order functions
     def buyLimit(self, quantity, price):
-        result = self.clients["spot"].new_order(
-            symbol=self.options["tradingPair"],
-            side="BUY",
-            type="LIMIT",
-            timeInForce="GTC",
-            price=price,
-            quantity=quantity,
-            recvWindow=20000)
         try:
-            self.orderRequestResultHandler(result)
+            result = self.clients["spot"].new_order(
+                symbol=self.options["tradingPair"],
+                side="BUY",
+                type="LIMIT",
+                timeInForce="GTC",
+                price=price,
+                quantity=quantity,
+                recvWindow=20000)
             # Step 2: If no errors were detected, construct a generalised Hermes response
             # TODO: Since only the abstractions for Binance is implemented, the API is still not clear. Standardised output is yet to be implemented, return raw result.
             return result
-        except HermesBaseException as err:
-            raise err
+        except BinanceClientError as err:
+            self.orderRequestResultHandler(err.error_code, err.error_message)
 
     def sellLimit(self, quantity, price):
-        result = self.clients["spot"].new_order(
-            symbol=self.options["tradingPair"],
-            side="SELL",
-            type="LIMIT",
-            timeInForce="GTC",
-            price=price,
-            quantity=quantity)
         try:
-            self.orderRequestResultHandler(result)
+            result = self.clients["spot"].new_order(
+                symbol=self.options["tradingPair"],
+                side="SELL",
+                type="LIMIT",
+                timeInForce="GTC",
+                price=price,
+                quantity=quantity)
             # Step 2: If no errors were detected, construct a generalised Hermes response
             # TODO: Since only the abstractions for Binance is implemented, the API is still not clear. Standardised output is yet to be implemented, return raw result.
             return result
-        except HermesBaseException as err:
-            raise err
+        except BinanceClientError as err:
+            self.orderRequestResultHandler(err.error_code, err.error_message)
     
     
     # Order managment functions
