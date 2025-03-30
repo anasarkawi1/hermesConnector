@@ -177,14 +177,22 @@ class Binance:
     # Entry cost based market orders
     def costBuy(self, cost: float):
         try:
-            result = self.clients["spot"].new_order(symbol=self.options["tradingPair"], side="BUY", type="MARKET", quoteOrderQty=cost)
+            result = self.clients["spot"].new_order(
+                symbol=self.options["tradingPair"],
+                side="BUY",
+                type="MARKET",
+                quoteOrderQty=cost)
             return result
         except BinanceClientError as err:
             self.orderRequestResultHandler(err.error_code, err.error_message)
 
     def costSell(self, cost: float):
         try:
-            result = self.clients["spot"].new_order(symbol=self.options["tradingPair"], side="SELL", type="MARKET", quoteOrderQty=cost)
+            result = self.clients["spot"].new_order(
+                symbol=self.options["tradingPair"],
+                side="SELL",
+                type="MARKET",
+                quoteOrderQty=cost)
         except BinanceClientError as err:
             self.orderRequestResultHandler(err.error_code, err.error_message)
         return result
@@ -196,7 +204,7 @@ class Binance:
                 symbol=self.options["tradingPair"],
                 side="BUY",
                 type="LIMIT",
-                timeInForce="GTC",
+                timeInForce="FOK",
                 price=price,
                 quantity=quantity,
                 recvWindow=20000)
@@ -212,7 +220,7 @@ class Binance:
                 symbol=self.options["tradingPair"],
                 side="SELL",
                 type="LIMIT",
-                timeInForce="GTC",
+                timeInForce="FOK",
                 price=price,
                 quantity=quantity)
             # Step 2: If no errors were detected, construct a generalised Hermes response
