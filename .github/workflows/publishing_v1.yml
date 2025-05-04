@@ -1,4 +1,4 @@
-# .github/workflows/publish.yml
+# .github/workflows/publishing_v1.yml
 name: Build and Publish Python Package
 
 on:
