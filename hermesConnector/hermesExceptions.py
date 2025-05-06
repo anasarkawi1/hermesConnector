@@ -67,6 +67,9 @@ class RequestTimeout(HermesBaseException):
     errCode     = 1008
     errStr      = "REQUEST_TIMEOUT"
 
+class HandlerNonExistent(HermesBaseException):
+    errCode     = 1009
+    errStr      = "WS_HANDLER_NX"
 
 #
 # Order errors 

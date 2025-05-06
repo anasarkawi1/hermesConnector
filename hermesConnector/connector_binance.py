@@ -10,7 +10,7 @@ import pandas as pd
 from pandas import DataFrame, concat
 import numpy as np
 import json
-from .hermesExceptions import  HermesBaseException, UnknownGenericHermesException, GenericOrderError, InsufficientBalance
+from .hermesExceptions import  HermesBaseException, InsufficientParameters, UnknownGenericHermesException, GenericOrderError, InsufficientBalance
 
 
 # Notes:
@@ -40,6 +40,10 @@ class Binance:
             credentials=["", ""],
             columns=None,
             wshandler=None):
+        
+        if (credentials[0] == "" or credentials[1] == ""):
+            raise InsufficientParameters
+
         if mode == 'live':
             baseURL = 'https://api.binance.com'
             baseWsURL = 'wss://stream.binance.com:9443'
@@ -131,12 +135,6 @@ class Binance:
 
         return self.accountData
     
-    def profit(self):
-        pass
-
-    def apiRestrictions(self):
-        pass
-
     def rejectedOrderExceptionMatcher(self, errMsg: str) -> HermesBaseException:
         match errMsg:
             case "Account has insufficient balance for requested action.":

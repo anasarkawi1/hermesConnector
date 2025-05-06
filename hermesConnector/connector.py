@@ -30,7 +30,8 @@ class Connector:
                     credentials=credentials,
                     wshandler=options["dataHandler"],
                     columns=options["columns"])
-
+            case "alpaca":
+                exchangeInstance = None
             case _:
                 return "EXCHANGE_INVALID"
             

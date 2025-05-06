@@ -15,8 +15,9 @@ requires-python = ">=3.11"
 dependencies = [
     "numpy",
     "pandas",
+    "dataclasses",
     "binance-connector",
-    "dataclasses"
+    "alpaca-py"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
