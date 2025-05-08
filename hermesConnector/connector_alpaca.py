@@ -11,8 +11,10 @@ from alpaca.trading.client import TradingClient
 from alpaca.data.live import StockDataStream
 from alpaca.data.models.bars import Bar
 from alpaca.trading.models import Clock as AlpacaClock
+from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading import enums as AlpacaTradingEnums
 
-from hermesConnector.models import ClockReturnModel
+from hermesConnector.models import ClockReturnModel, MarketOrderParams
 
 
 
@@ -56,8 +58,34 @@ class Alpaca(ConnectorTemplate):
     def account(self):
         pass
 
-    def buy(self):
-        pass
+    # TODO: Make a return model for orders.
+    def buy(self, orderData: MarketOrderParams):
+        orderSide       = None
+        tifEnum         = None
+
+        # Determine the order side
+        if orderData.side == "BUY":
+            orderSide = AlpacaTradingEnums.OrderSide.BUY
+        elif orderData.side == "SELL":
+            orderSide = AlpacaTradingEnums.OrderSide.SELL
+        
+        match orderData.tif:
+            case "GTC":
+                tifEnum = AlpacaTradingEnums.TimeInForce.GTC
+            case "IOC":
+                tifEnum = AlpacaTradingEnums.TimeInForce.IOC
+            case _:
+                raise InsufficientParameters
+        
+        # Consturct API request model
+        reqModel = MarketOrderRequest(
+            symbol=self.options.tradingPair,
+            qty=orderData.qty,
+            side=orderSide,
+            time_in_force=tifEnum)
+        
+        # Submit order
+        orderResult = self.clients["trading"].submit_order(order_data=reqModel)
     
     def sell(self):
         pass
