@@ -50,8 +50,8 @@ class Alpaca(ConnectorTemplate):
             nextClose=currentTime.next_close,
             currentTimestamp=currentTime.timestamp)
 
-    def stop(self):
-        pass
+    def stop(self) -> None:
+        self.clients["trading"].stop()
 
     def account(self):
         pass

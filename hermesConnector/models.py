@@ -1,11 +1,11 @@
 
 
 
-from pydantic import BaseModel
+from models_utilities import HermesBaseModel
 from datetime import datetime
 
 
-class ClockReturnModel(BaseModel):
+class ClockReturnModel(HermesBaseModel):
     isOpen                  : bool
     nextOpen                : datetime
     nextClose               : datetime

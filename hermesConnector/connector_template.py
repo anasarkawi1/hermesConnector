@@ -48,7 +48,7 @@ class ConnectorTemplate(ABC):
         pass
 
     @abstractmethod
-    def stop(self):
+    def stop(self) -> None:
         pass
 
     @abstractmethod
