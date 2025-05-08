@@ -74,6 +74,7 @@ class Binance:
     # TODO: Format the output
     # https://binance-connector.readthedocs.io/en/latest/binance.spot.trade.html#account-information-user-data
     # The balance feature is only available for certain coins for development purposes
+    # TODO: This function has to be rethinked completely
     accountData = {
         "commissions": {
             "maker": None,
@@ -135,6 +136,7 @@ class Binance:
 
         return self.accountData
     
+
     def rejectedOrderExceptionMatcher(self, errMsg: str) -> HermesBaseException:
         match errMsg:
             case "Account has insufficient balance for requested action.":

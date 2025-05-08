@@ -4,36 +4,31 @@
 
 # Load modules
 from hermesConnector.hermesExceptions import InsufficientParameters, HandlerNonExistent
+from connector_template import ConnectorTemplate
 
 # Alpaca Imports
 from alpaca.trading.client import TradingClient
 from alpaca.data.live import StockDataStream
 from alpaca.data.models.bars import Bar
+from alpaca.trading.models import Clock as AlpacaClock
+
+from hermesConnector.models import ClockReturnModel
 
 
 
-class Alpaca:
+class Alpaca(ConnectorTemplate):
 
-    def __init__(
-            self,
-            mode='live',
-            tradingPair=None,
-            interval=None,
-            limit=75,
-            credentials=["", ""],
-            columns=None,
-            wshandler=None):
-        
-        # Check if the credentials were provided
-        if (credentials[0] == "" or credentials[1] == ""):
-            raise InsufficientParameters
+    def __init__(self):
+
+        # Initialise parent class
+        super().__init__()
         
         # Initialise live or paper trading client
         client = None
-        if mode == 'live':
-            client = TradingClient(credentials[0], credentials[1])
-        elif mode == 'test':
-            client = TradingClient(credentials[0], credentials[1], paper=True)
+        if self.options.mode == 'live':
+            client = TradingClient(self.options.credentials[0], self.options.credentials[1])
+        elif self.options.mode == 'test':
+            client = TradingClient(self.options.credentials[0], self.options.credentials[1], paper=True)
         
         # Clients dictionary
         self.clients: dict[str, TradingClient | StockDataStream] = {
@@ -42,20 +37,18 @@ class Alpaca:
         }
 
         # Initialise WS client
-        if wshandler != None:
-            self.clients["ws"] = StockDataStream(credentials[0], credentials[1])
-        
-        # Store options
-        self.options = {
-            "tradingPair": tradingPair,
-            "interval": interval,
-            "limit": limit,
-            "mode": mode,
-            "handler": wshandler,
-            "columns": columns,
-            "dataHandler": wshandler
-        }
-
+        if self.options.dataHandler != None:
+            self.clients["ws"] = StockDataStream(
+                self.options.credentials[0],
+                self.options.credentials[1])
+    
+    def exchangeClock(self) -> ClockReturnModel:
+        currentTime: AlpacaClock = self.clients["trading"].get_clock()
+        return ClockReturnModel(
+            isOpen=currentTime.is_open,
+            nextOpen=currentTime.next_open,
+            nextClose=currentTime.next_close,
+            currentTimestamp=currentTime.timestamp)
 
     def stop(self):
         pass
@@ -63,16 +56,13 @@ class Alpaca:
     def account(self):
         pass
 
-    def apiRestriction(self):
-        pass
-
-    def buy():
+    def buy(self):
         pass
     
-    def sell():
+    def sell(self):
         pass
 
-    def buyCost():
+    def buyCost(self):
         pass
 
     def sellCost(self):
@@ -90,13 +80,13 @@ class Alpaca:
     def cancelOrder(self):
         pass
 
-    def currentOrder():
+    def currentOrder(self):
         pass
 
-    def getAllOrders():
+    def getAllOrders(self):
         pass
 
-    def historicData():
+    def historicData(self):
         pass
 
     def initiateLiveData(self):
@@ -108,7 +98,7 @@ class Alpaca:
         # Configure WS client
         self.clients["ws"].subscribe_bars(
             self.wsHandlerInternal,
-            self.options["tradingPair"])
+            self.options.tradingPair)
         
         # Start WS client
         self.clients["ws"].run()
