@@ -13,6 +13,7 @@ from alpaca.data.models.bars import Bar
 from alpaca.trading.models import Clock as AlpacaClock
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading import enums as AlpacaTradingEnums
+from alpaca.common.exceptions import APIError
 
 from .models import ClockReturnModel, MarketOrderQtyParams, MarketOrderResult
 from .hermes_enums import TimeInForce as HermesTIF, OrderSide as HermesOrderSide
@@ -96,11 +97,15 @@ class Alpaca(ConnectorTemplate):
                 raise InsufficientParameters
         
         # Consturct API request model
-        reqModel = MarketOrderRequest(
-            symbol=self.options.tradingPair,
-            qty=orderParams.qty,
-            side=orderSide,
-            time_in_force=tifEnum)
+        reqModel = None
+        try:
+            reqModel = MarketOrderRequest(
+                symbol=self.options.tradingPair,
+                qty=orderParams.qty,
+                side=orderSide,
+                time_in_force=tifEnum)
+        except APIError as err:
+            raise err
         
         # Submit order
         orderResult = self.clients["trading"].submit_order(order_data=reqModel)
