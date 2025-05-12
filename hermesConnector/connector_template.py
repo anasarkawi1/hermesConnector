@@ -3,19 +3,21 @@
 
 from abc import ABC, abstractmethod
 from hermesConnector.hermesExceptions import InsufficientParameters
-from pydantic import BaseModel
 from datetime import datetime
+import typing_extensions as typing
 
-from hermesConnector.models import ClockReturnModel
+from hermesConnector.models import ClockReturnModel, MarketOrderQtyParams, MarketOrderResult
+from hermesConnector.models_utilities import HermesBaseModel
 
 
-class ConnectorOptions(BaseModel):
+class ConnectorOptions(HermesBaseModel):
     tradingPair         : str
     interval            : str
     limit               : str
     mode                : str
-    columns             : any | None
-    dataHandler         : callable | None
+    columns             : typing.Optional[any]
+    dataHandler         : typing.Optional[callable]
+    credentials         : list
 
 
 class ConnectorTemplate(ABC):
@@ -41,10 +43,23 @@ class ConnectorTemplate(ABC):
             limit=limit,
             mode=mode,
             columns=columns,
-            dataHandler=wshandler)
+            dataHandler=wshandler,
+            credentials=credentials)
 
     @abstractmethod
     def exchangeClock(self) -> ClockReturnModel:
+        """
+            Returns the current clock and exchagne clock.
+            
+            Parameters
+            ----------
+                None
+            
+            Returns
+            -------
+                ClockReturnModel
+                    Clock information about the exchange as a HermesBaseModel.
+        """
         pass
 
     @abstractmethod
@@ -52,27 +67,30 @@ class ConnectorTemplate(ABC):
         pass
 
     @abstractmethod
-    def buy(self):
+    def marketOrderQty(
+        self,
+        orderParams: MarketOrderQtyParams) -> MarketOrderResult:
+        """
+            Submits a market order based on the quantity of the base asset.
+            
+            Parameters
+            ----------
+            orderParams: MarketOrderQtyParams
+                Order parameters and input as a HermesBaseModel.
+
+            Returns
+            -------
+            MarketOrderReturn
+                Return of the exchange response, standardised as a HermesBaseModel.
+        """
+        pass
+
+    @abstractmethod
+    def marketOrderCost(self):
         pass
     
     @abstractmethod
-    def sell(self):
-        pass
-
-    @abstractmethod
-    def buyCost(self):
-        pass
-
-    @abstractmethod
-    def sellCost(self):
-        pass
-    
-    @abstractmethod
-    def buyLimit(self):
-        pass
-
-    @abstractmethod
-    def sellLimit(self):
+    def limitOrder(self):
         pass
 
     @abstractmethod

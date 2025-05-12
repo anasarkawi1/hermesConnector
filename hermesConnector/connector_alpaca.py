@@ -3,8 +3,8 @@
 
 
 # Load modules
-from hermesConnector.hermesExceptions import InsufficientParameters, HandlerNonExistent
-from connector_template import ConnectorTemplate
+from .hermesExceptions import InsufficientParameters, HandlerNonExistent, UnknownGenericHermesException
+from .connector_template import ConnectorTemplate
 
 # Alpaca Imports
 from alpaca.trading.client import TradingClient
@@ -14,16 +14,32 @@ from alpaca.trading.models import Clock as AlpacaClock
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading import enums as AlpacaTradingEnums
 
-from hermesConnector.models import ClockReturnModel, MarketOrderParams
+from .models import ClockReturnModel, MarketOrderQtyParams, MarketOrderResult
+from .hermes_enums import TimeInForce as HermesTIF, OrderSide as HermesOrderSide
 
 
 
 class Alpaca(ConnectorTemplate):
 
-    def __init__(self):
+    def __init__(
+            self,
+            tradingPair,
+            interval,
+            mode='live',
+            limit=75,
+            credentials=["", ""],
+            columns=None,
+            wshandler=None):
 
         # Initialise parent class
-        super().__init__()
+        super().__init__(
+            tradingPair,
+            interval,
+            mode,
+            limit,
+            credentials,
+            columns,
+            wshandler)
         
         # Initialise live or paper trading client
         client = None
@@ -59,20 +75,22 @@ class Alpaca(ConnectorTemplate):
         pass
 
     # TODO: Make a return model for orders.
-    def buy(self, orderData: MarketOrderParams):
+    def marketOrderQty(
+            self,
+            orderParams: MarketOrderQtyParams) -> MarketOrderResult:
         orderSide       = None
         tifEnum         = None
 
         # Determine the order side
-        if orderData.side == "BUY":
+        if orderParams.side == "BUY":
             orderSide = AlpacaTradingEnums.OrderSide.BUY
-        elif orderData.side == "SELL":
+        elif orderParams.side == "SELL":
             orderSide = AlpacaTradingEnums.OrderSide.SELL
         
-        match orderData.tif:
-            case "GTC":
+        match orderParams.tif:
+            case HermesTIF.GTC:
                 tifEnum = AlpacaTradingEnums.TimeInForce.GTC
-            case "IOC":
+            case HermesTIF.IOC:
                 tifEnum = AlpacaTradingEnums.TimeInForce.IOC
             case _:
                 raise InsufficientParameters
@@ -80,26 +98,55 @@ class Alpaca(ConnectorTemplate):
         # Consturct API request model
         reqModel = MarketOrderRequest(
             symbol=self.options.tradingPair,
-            qty=orderData.qty,
+            qty=orderParams.qty,
             side=orderSide,
             time_in_force=tifEnum)
         
         # Submit order
         orderResult = self.clients["trading"].submit_order(order_data=reqModel)
+
+        # Generate JSON string of the exchange response
+        jsonStr = orderResult.model_dump_json()
+
+        orderSideResult = None
+        match orderResult.side:
+            case AlpacaTradingEnums.OrderSide.BUY:
+                orderSideResult = 'BUY'
+            case AlpacaTradingEnums.OrderSide.SELL:
+                orderSideResult = 'SELL'
+            case _:
+                raise UnknownGenericHermesException
+
+        # Generate output
+        output = MarketOrderResult(
+            order_id            = str(orderResult.id),
+            created_at          = orderResult.created_at,
+            updated_at          = orderResult.updated_at,
+            submitted_at        = orderResult.submitted_at,
+            filled_at           = orderResult.filled_at,
+            expired_at          = orderResult.expired_at,
+            expires_at          = orderResult.expires_at,
+            canceled_at         = orderResult.canceled_at,
+            failed_at           = orderResult.failed_at,
+            asset_id            = str(orderResult.asset_id),
+            symbol              = orderResult.symbol,
+            notional            = orderResult.notional,
+            qty                 = orderResult.qty,
+            filled_qty          = orderResult.filled_qty,
+            filled_avg_price    = orderResult.filled_avg_price,
+            type                = orderResult.type,
+            side                = orderSideResult,
+            time_in_force       = orderResult.time_in_force,
+            status              = orderResult.status,
+            raw                 = jsonStr)
+        
+        # Return output
+        return output
     
-    def sell(self):
+    def marketOrderCost(self):
         pass
 
-    def buyCost(self):
-        pass
-
-    def sellCost(self):
-        pass
-
-    def buyLimit(self):
-        pass
-
-    def sellLimit(self):
+    def limitOrder(self):
         pass
 
     def queryOrder(self):

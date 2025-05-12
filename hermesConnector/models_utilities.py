@@ -5,7 +5,7 @@
 
 
 # Module imports
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from pprint import pprint
 
 
@@ -13,5 +13,7 @@ from pprint import pprint
 
 class HermesBaseModel(BaseModel):
 
-    def __repr__(self):
-        pass
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    # def __repr__(self):
+    #     pass

@@ -2,10 +2,11 @@
 # By Anas Arkawi, 2023.
 
 
-__all__ = ["connector_binance"]
+__all__ = ["connector_template", "connector_binance", "connector_alpaca"]
 
 
 # Own module import
+from .connector_alpaca import Alpaca
 from .connector_binance import Binance
 
 
@@ -31,8 +32,16 @@ class Connector:
                     wshandler=options["dataHandler"],
                     columns=options["columns"])
             case "alpaca":
-                exchangeInstance = None
+                exchangeInstance = Alpaca(
+                    mode=options["mode"],
+                    tradingPair=options["tradingPair"],
+                    interval=options["interval"],
+                    limit=options["limit"],
+                    credentials=credentials,
+                    wshandler=options["dataHandler"],
+                    columns=options["columns"])
             case _:
+                # TODO: Change this to an exception
                 return "EXCHANGE_INVALID"
             
         return exchangeInstance
