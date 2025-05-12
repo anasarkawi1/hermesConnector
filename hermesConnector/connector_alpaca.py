@@ -15,7 +15,7 @@ from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading import enums as AlpacaTradingEnums
 from alpaca.common.exceptions import APIError
 
-from .models import ClockReturnModel, MarketOrderQtyParams, MarketOrderResult
+from .models import ClockReturnModel, MarketOrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
 from .hermes_enums import TimeInForce as HermesTIF, OrderSide as HermesOrderSide
 
 
@@ -75,10 +75,10 @@ class Alpaca(ConnectorTemplate):
     def account(self):
         pass
 
-    # TODO: Make a return model for orders.
-    def marketOrderQty(
+    def _marketOrderParamConstructor(
             self,
-            orderParams: MarketOrderQtyParams) -> MarketOrderResult:
+            orderParams: MarketOrderBaseParams) -> list[AlpacaTradingEnums.OrderSide, AlpacaTradingEnums.TimeInForce]:
+        
         orderSide       = None
         tifEnum         = None
 
@@ -87,26 +87,25 @@ class Alpaca(ConnectorTemplate):
             orderSide = AlpacaTradingEnums.OrderSide.BUY
         elif orderParams.side == "SELL":
             orderSide = AlpacaTradingEnums.OrderSide.SELL
+        else:
+            raise InsufficientParameters
         
+        # Determine the time in force
         match orderParams.tif:
             case HermesTIF.GTC:
                 tifEnum = AlpacaTradingEnums.TimeInForce.GTC
             case HermesTIF.IOC:
                 tifEnum = AlpacaTradingEnums.TimeInForce.IOC
+            case HermesTIF.DAY:
+                tifEnum = AlpacaTradingEnums.TimeInForce.DAY
             case _:
                 raise InsufficientParameters
-        
-        # Consturct API request model
-        reqModel = None
-        try:
-            reqModel = MarketOrderRequest(
-                symbol=self.options.tradingPair,
-                qty=orderParams.qty,
-                side=orderSide,
-                time_in_force=tifEnum)
-        except APIError as err:
-            raise err
-        
+
+        return [orderSide, tifEnum]
+
+    def _marketOrderSubmit(
+            self,
+            reqModel: MarketOrderRequest):
         # Submit order
         orderResult = self.clients["trading"].submit_order(order_data=reqModel)
 
@@ -147,9 +146,44 @@ class Alpaca(ConnectorTemplate):
         
         # Return output
         return output
+
+    def marketOrderQty(
+            self,
+            orderParams: MarketOrderQtyParams) -> MarketOrderResult:
+        
+        orderSide, tifEnum = self._marketOrderParamConstructor(orderParams=orderParams)
+
+        # Consturct API request model
+        reqModel = None
+        try:
+            reqModel = MarketOrderRequest(
+                symbol=self.options.tradingPair,
+                qty=orderParams.qty,
+                side=orderSide,
+                time_in_force=tifEnum)
+        except APIError as err:
+            raise err
+        
+        return self._marketOrderSubmit(reqModel=reqModel)
     
-    def marketOrderCost(self):
-        pass
+    def marketOrderCost(
+            self,
+            orderParams: MarketOrderNotionalParams) -> MarketOrderResult:
+        
+        orderSide, tifEnum = self._marketOrderParamConstructor(orderParams=orderParams)
+
+        # Consturct API request model
+        reqModel = None
+        try:
+            reqModel = MarketOrderRequest(
+                symbol=self.options.tradingPair,
+                notional=orderParams.cost,
+                side=orderSide,
+                time_in_force=tifEnum)
+        except APIError as err:
+            raise err
+        
+        return self._marketOrderSubmit(reqModel=reqModel)
 
     def limitOrder(self):
         pass

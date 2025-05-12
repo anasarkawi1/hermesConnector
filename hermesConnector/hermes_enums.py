@@ -16,7 +16,8 @@ class OrderSide(str, Enum):
 
 class TimeInForce(str, Enum):
     GTC                     = "gtc"
-    IOC                     = "IOC"
+    IOC                     = "ioc"
+    DAY                     = "day"
 
 class OrderStatus(str, Enum):
     NEW                     = "new"

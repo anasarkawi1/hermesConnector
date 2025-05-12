@@ -18,10 +18,16 @@ class ClockReturnModel(HermesBaseModel):
 # Order input models
 #
 
-class MarketOrderQtyParams(HermesBaseModel):
-    qty         : float
+class MarketOrderBaseParams(HermesBaseModel):
     side        : OrderSide
     tif         : TimeInForce
+
+
+class MarketOrderQtyParams(MarketOrderBaseParams):
+    qty         : float
+
+class MarketOrderNotionalParams(MarketOrderBaseParams):
+    cost        : float
 
 
 #

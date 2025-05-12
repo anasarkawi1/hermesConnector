@@ -12,7 +12,7 @@ from hermesConnector.connector_template import ConnectorOptions
 import signal
 from hermesConnector.hermes_enums import OrderSide, TimeInForce
 
-from hermesConnector.models import MarketOrderQtyParams, MarketOrderResult
+from hermesConnector.models import MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
 signal.signal(signal.SIGINT, signal.SIG_DFL)
 
 
@@ -58,12 +58,18 @@ print('Submitting Order')
 print('****************')
 
 # Construct order
-orderReq: MarketOrderQtyParams = MarketOrderQtyParams(
-    qty=200.0,
-    side=OrderSide.BUY,
-    tif=TimeInForce.GTC)
+# orderReq: MarketOrderQtyParams = MarketOrderQtyParams(
+#     qty=200.0,
+#     side=OrderSide.BUY,
+#     tif=TimeInForce.GTC)
 
-orderResult: MarketOrderResult = exchange.marketOrderQty(orderParams=orderReq)
+orderReq: MarketOrderNotionalParams = MarketOrderNotionalParams(
+    cost=400,
+    side=OrderSide.BUY,
+    tif=TimeInForce.DAY
+)
+
+orderResult: MarketOrderResult = exchange.marketOrderCost(orderParams=orderReq)
 
 pprint(orderResult)
 
