@@ -15,7 +15,7 @@ from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading import enums as AlpacaTradingEnums
 from alpaca.common.exceptions import APIError
 
-from .models import ClockReturnModel, MarketOrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
+from .models import ClockReturnModel, LimitOrderBaseParams, OrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
 from .hermes_enums import TimeInForce as HermesTIF, OrderSide as HermesOrderSide
 
 
@@ -75,10 +75,23 @@ class Alpaca(ConnectorTemplate):
     def account(self):
         pass
 
-    def _marketOrderParamConstructor(
+    def _orderParamConstructor(
             self,
-            orderParams: MarketOrderBaseParams) -> list[AlpacaTradingEnums.OrderSide, AlpacaTradingEnums.TimeInForce]:
+            orderParams: OrderBaseParams) -> list[AlpacaTradingEnums.OrderSide, AlpacaTradingEnums.TimeInForce]:
         
+        """
+            Returns an array containing the exchange specific "Order Side" and "Time in Force" parameters of an order.
+
+            Parameters
+            ----------
+                orderParams: OrderBaseParams
+                    Hermes order parameters
+
+            Returns
+            -------
+                list[AlpacaTradingEnums.OrderSide, AlpacaTradingEnums.TimeInForce]
+        """
+
         orderSide       = None
         tifEnum         = None
 
@@ -103,6 +116,17 @@ class Alpaca(ConnectorTemplate):
 
         return [orderSide, tifEnum]
 
+    def _orderSideMatcher(self, orderSide: str):
+        orderSideResult = None
+        match orderSide:
+            case AlpacaTradingEnums.OrderSide.BUY:
+                orderSideResult = HermesOrderSide.BUY
+            case AlpacaTradingEnums.OrderSide.SELL:
+                orderSideResult = HermesOrderSide.SELL
+            case _:
+                raise UnknownGenericHermesException
+        return orderSideResult
+
     def _marketOrderSubmit(
             self,
             reqModel: MarketOrderRequest):
@@ -112,14 +136,8 @@ class Alpaca(ConnectorTemplate):
         # Generate JSON string of the exchange response
         jsonStr = orderResult.model_dump_json()
 
-        orderSideResult = None
-        match orderResult.side:
-            case AlpacaTradingEnums.OrderSide.BUY:
-                orderSideResult = 'BUY'
-            case AlpacaTradingEnums.OrderSide.SELL:
-                orderSideResult = 'SELL'
-            case _:
-                raise UnknownGenericHermesException
+        # Match order side to its Hermes enum
+        orderSideResult = self._orderSideMatcher(orderResult.side)
 
         # Generate output
         output = MarketOrderResult(
@@ -138,10 +156,12 @@ class Alpaca(ConnectorTemplate):
             qty                 = orderResult.qty,
             filled_qty          = orderResult.filled_qty,
             filled_avg_price    = orderResult.filled_avg_price,
-            type                = orderResult.type,
+            # Enums
             side                = orderSideResult,
+            type                = orderResult.type,
             time_in_force       = orderResult.time_in_force,
             status              = orderResult.status,
+            # Raw response as a json string
             raw                 = jsonStr)
         
         # Return output
@@ -151,7 +171,7 @@ class Alpaca(ConnectorTemplate):
             self,
             orderParams: MarketOrderQtyParams) -> MarketOrderResult:
         
-        orderSide, tifEnum = self._marketOrderParamConstructor(orderParams=orderParams)
+        orderSide, tifEnum = self._orderParamConstructor(orderParams=orderParams)
 
         # Consturct API request model
         reqModel = None
@@ -170,7 +190,7 @@ class Alpaca(ConnectorTemplate):
             self,
             orderParams: MarketOrderNotionalParams) -> MarketOrderResult:
         
-        orderSide, tifEnum = self._marketOrderParamConstructor(orderParams=orderParams)
+        orderSide, tifEnum = self._orderParamConstructor(orderParams=orderParams)
 
         # Consturct API request model
         reqModel = None
