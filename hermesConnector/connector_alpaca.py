@@ -11,11 +11,11 @@ from alpaca.trading.client import TradingClient
 from alpaca.data.live import StockDataStream
 from alpaca.data.models.bars import Bar
 from alpaca.trading.models import Clock as AlpacaClock
-from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
 from alpaca.trading import enums as AlpacaTradingEnums
 from alpaca.common.exceptions import APIError
 
-from .models import ClockReturnModel, LimitOrderBaseParams, OrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
+from .models import ClockReturnModel, LimitOrderBaseParams, LimitOrderResult, OrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
 from .hermes_enums import TimeInForce as HermesTIF, OrderSide as HermesOrderSide
 
 
@@ -130,42 +130,46 @@ class Alpaca(ConnectorTemplate):
     def _marketOrderSubmit(
             self,
             reqModel: MarketOrderRequest):
-        # Submit order
-        orderResult = self.clients["trading"].submit_order(order_data=reqModel)
-
-        # Generate JSON string of the exchange response
-        jsonStr = orderResult.model_dump_json()
-
-        # Match order side to its Hermes enum
-        orderSideResult = self._orderSideMatcher(orderResult.side)
-
-        # Generate output
-        output = MarketOrderResult(
-            order_id            = str(orderResult.id),
-            created_at          = orderResult.created_at,
-            updated_at          = orderResult.updated_at,
-            submitted_at        = orderResult.submitted_at,
-            filled_at           = orderResult.filled_at,
-            expired_at          = orderResult.expired_at,
-            expires_at          = orderResult.expires_at,
-            canceled_at         = orderResult.canceled_at,
-            failed_at           = orderResult.failed_at,
-            asset_id            = str(orderResult.asset_id),
-            symbol              = orderResult.symbol,
-            notional            = orderResult.notional,
-            qty                 = orderResult.qty,
-            filled_qty          = orderResult.filled_qty,
-            filled_avg_price    = orderResult.filled_avg_price,
-            # Enums
-            side                = orderSideResult,
-            type                = orderResult.type,
-            time_in_force       = orderResult.time_in_force,
-            status              = orderResult.status,
-            # Raw response as a json string
-            raw                 = jsonStr)
         
-        # Return output
-        return output
+        # Submit order
+        try:
+            orderResult = self.clients["trading"].submit_order(order_data=reqModel)
+            # Generate JSON string of the exchange response
+            jsonStr = orderResult.model_dump_json()
+
+            # Match order side to its Hermes enum
+            orderSideResult = self._orderSideMatcher(orderResult.side)
+
+            # Generate output
+            output = MarketOrderResult(
+                order_id            = str(orderResult.id),
+                created_at          = orderResult.created_at,
+                updated_at          = orderResult.updated_at,
+                submitted_at        = orderResult.submitted_at,
+                filled_at           = orderResult.filled_at,
+                expired_at          = orderResult.expired_at,
+                expires_at          = orderResult.expires_at,
+                canceled_at         = orderResult.canceled_at,
+                failed_at           = orderResult.failed_at,
+                asset_id            = str(orderResult.asset_id),
+                symbol              = orderResult.symbol,
+                notional            = orderResult.notional,
+                qty                 = orderResult.qty,
+                filled_qty          = orderResult.filled_qty,
+                filled_avg_price    = orderResult.filled_avg_price,
+                # Enums
+                side                = orderSideResult,
+                type                = orderResult.type,
+                time_in_force       = orderResult.time_in_force,
+                status              = orderResult.status,
+                # Raw response as a json string
+                raw                 = jsonStr)
+            
+            # Return output
+            return output
+        except APIError as err:
+            raise err
+
 
     def marketOrderQty(
             self,
@@ -174,15 +178,11 @@ class Alpaca(ConnectorTemplate):
         orderSide, tifEnum = self._orderParamConstructor(orderParams=orderParams)
 
         # Consturct API request model
-        reqModel = None
-        try:
-            reqModel = MarketOrderRequest(
-                symbol=self.options.tradingPair,
-                qty=orderParams.qty,
-                side=orderSide,
-                time_in_force=tifEnum)
-        except APIError as err:
-            raise err
+        reqModel = MarketOrderRequest(
+            symbol=self.options.tradingPair,
+            qty=orderParams.qty,
+            side=orderSide,
+            time_in_force=tifEnum)
         
         return self._marketOrderSubmit(reqModel=reqModel)
     
@@ -193,20 +193,69 @@ class Alpaca(ConnectorTemplate):
         orderSide, tifEnum = self._orderParamConstructor(orderParams=orderParams)
 
         # Consturct API request model
-        reqModel = None
-        try:
-            reqModel = MarketOrderRequest(
-                symbol=self.options.tradingPair,
-                notional=orderParams.cost,
-                side=orderSide,
-                time_in_force=tifEnum)
-        except APIError as err:
-            raise err
+        reqModel = MarketOrderRequest(
+            symbol=self.options.tradingPair,
+            notional=orderParams.cost,
+            side=orderSide,
+            time_in_force=tifEnum)
         
         return self._marketOrderSubmit(reqModel=reqModel)
 
-    def limitOrder(self):
-        pass
+    def _limitOrderSubmit(self, reqModel: LimitOrderRequest) -> LimitOrderResult:
+        # Submit order
+        try:
+            orderResult = self.clients["trading"].submit_order(reqModel)
+
+            # Generate JSON string from exchange response
+            jsonStr = orderResult.model_dump_json()
+
+            # Match order side to its hermes enum
+            orderSideResult = self._orderSideMatcher(orderResult.side)
+
+            # TODO: Make the result for the order (probably similar to the market order.)
+            output = LimitOrderResult(
+                order_id            = str(orderResult.id),
+                created_at          = orderResult.created_at,
+                updated_at          = orderResult.updated_at,
+                submitted_at        = orderResult.submitted_at,
+                filled_at           = orderResult.filled_at,
+                expired_at          = orderResult.expired_at,
+                expires_at          = orderResult.expires_at,
+                canceled_at         = orderResult.canceled_at,
+                failed_at           = orderResult.failed_at,
+                asset_id            = str(orderResult.asset_id),
+                symbol              = orderResult.symbol,
+                notional            = orderResult.notional,
+                qty                 = orderResult.qty,
+                filled_qty          = orderResult.filled_qty,
+                filled_avg_price    = orderResult.filled_avg_price,
+                # Enums
+                side                = orderSideResult,
+                type                = orderResult.type,
+                time_in_force       = orderResult.time_in_force,
+                status              = orderResult.status,
+                # Limit order specific
+                limit_price         = orderResult.limit_price,
+                # Raw response as a json string
+                raw                 = jsonStr)
+            return output
+        except APIError as err:
+            raise err
+
+    def limitOrder(
+            self,
+            orderParams: LimitOrderBaseParams):
+        
+        orderSideEnum, tifEnum = self._orderParamConstructor(orderParams=orderParams)
+
+        # Construct API request model
+        reqModel = LimitOrderRequest(
+            symbol=self.options.tradingPair,
+            qty=orderParams.qty,
+            side=orderSideEnum,
+            time_in_force=tifEnum)
+        
+        return self._limitOrderSubmit(reqModel=reqModel)
 
     def queryOrder(self):
         pass

@@ -31,7 +31,7 @@ class MarketOrderNotionalParams(OrderBaseParams):
 
 
 class LimitOrderBaseParams(OrderBaseParams):
-    pass
+    qty         : int
 
 #
 # Order return models
