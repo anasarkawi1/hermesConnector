@@ -57,6 +57,7 @@ class BaseOrderResult(HermesBaseModel):
     side                        : typing.Optional[OrderSide]
     time_in_force               : TimeInForce
     status                      : OrderStatus
+    limit_price                 : typing.Optional[float] = None
 
     # Raw exchange response as a JSON string. Used for archival and redundancy reasons.
     raw                         : typing.Union[str, any]
@@ -66,5 +67,4 @@ class MarketOrderResult(BaseOrderResult):
     pass
 
 class LimitOrderResult(BaseOrderResult):
-    limit_price                 : typing.Optional[float] = None
     pass

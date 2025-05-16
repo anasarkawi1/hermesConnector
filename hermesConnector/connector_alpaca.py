@@ -15,8 +15,10 @@ from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
 from alpaca.trading import enums as AlpacaTradingEnums
 from alpaca.common.exceptions import APIError
 
-from .models import ClockReturnModel, LimitOrderBaseParams, LimitOrderResult, OrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
-from .hermes_enums import TimeInForce as HermesTIF, OrderSide as HermesOrderSide
+from .models import BaseOrderResult, ClockReturnModel, LimitOrderBaseParams, LimitOrderResult, OrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
+
+# TODO: Tidy this up. Put all the imports inside a single reference instead of individual imports
+from .hermes_enums import TimeInForce as HermesTIF, OrderSide as HermesOrderSide, OrderStatus as HermesOrderStatus
 
 
 
@@ -116,7 +118,7 @@ class Alpaca(ConnectorTemplate):
 
         return [orderSide, tifEnum]
 
-    def _orderSideMatcher(self, orderSide: str):
+    def _orderSideMatcher(self, orderSide: AlpacaTradingEnums.OrderSide):
         orderSideResult = None
         match orderSide:
             case AlpacaTradingEnums.OrderSide.BUY:
@@ -257,11 +259,62 @@ class Alpaca(ConnectorTemplate):
         
         return self._limitOrderSubmit(reqModel=reqModel)
 
-    def queryOrder(self):
-        pass
+    def queryOrder(self, orderId: str) -> BaseOrderResult:
+        # Query order
+        queriedOrder = self.clients["trading"].get_order_by_id(order_id=orderId)
 
-    def cancelOrder(self):
-        pass
+        # Convert to JSON string
+        jsonStr = queriedOrder.model_dump_json()
+
+        # Convert enums
+        orderSideResult = self._orderSideMatcher(queriedOrder.side)
+
+        # Format order data into a model
+        outputModel = BaseOrderResult(
+            order_id            = str(queriedOrder.id),
+                created_at          = queriedOrder.created_at,
+                updated_at          = queriedOrder.updated_at,
+                submitted_at        = queriedOrder.submitted_at,
+                filled_at           = queriedOrder.filled_at,
+                expired_at          = queriedOrder.expired_at,
+                expires_at          = queriedOrder.expires_at,
+                canceled_at         = queriedOrder.canceled_at,
+                failed_at           = queriedOrder.failed_at,
+                asset_id            = str(queriedOrder.asset_id),
+                symbol              = queriedOrder.symbol,
+                notional            = queriedOrder.notional,
+                qty                 = queriedOrder.qty,
+                filled_qty          = queriedOrder.filled_qty,
+                filled_avg_price    = queriedOrder.filled_avg_price,
+                # Enums
+                side                = orderSideResult,
+                type                = queriedOrder.type,
+                time_in_force       = queriedOrder.time_in_force,
+                status              = queriedOrder.status,
+                # Raw response as a json string
+                raw                 = jsonStr)
+        
+        # Return model
+        return outputModel
+
+    def cancelOrder(self, orderId: str) -> bool:
+        # Query order
+        targetOrder = self.queryOrder(orderId=orderId)
+
+        # Get order status and check against dissalowed states
+        disallowedStates = [
+            HermesOrderStatus.FILLED,
+            HermesOrderStatus.CANCELED,
+            HermesOrderStatus.EXPIRED]
+        
+        orderStatus = targetOrder.status
+        for dState in disallowedStates:
+            if (orderStatus == dState):
+                return False
+        
+        # The loop terminated without returning, continue with cancellation
+        self.clients["trading"].cancel_order_by_id(order_id=orderId)
+        return True
 
     def currentOrder(self):
         pass

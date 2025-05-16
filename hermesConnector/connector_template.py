@@ -6,7 +6,7 @@ from hermesConnector.hermesExceptions import InsufficientParameters
 from datetime import datetime
 import typing_extensions as typing
 
-from hermesConnector.models import ClockReturnModel, MarketOrderQtyParams, MarketOrderResult
+from hermesConnector.models import BaseOrderResult, ClockReturnModel, MarketOrderQtyParams, MarketOrderResult
 from hermesConnector.models_utilities import HermesBaseModel
 
 
@@ -93,8 +93,21 @@ class ConnectorTemplate(ABC):
     def limitOrder(self):
         pass
 
+    # TODO: Determine the outpur type
     @abstractmethod
-    def queryOrder(self):
+    def queryOrder(self, orderId: str) -> BaseOrderResult:
+        """
+            Queries a submitted order by the order ID.
+
+            Parameters
+            ----------
+            orderId: str
+                ID string for the order
+            
+            Returns
+            -------
+        """
+        
         pass
     
     @abstractmethod
