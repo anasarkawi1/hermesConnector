@@ -10,8 +10,8 @@ from .connector_template import ConnectorTemplate
 from alpaca.trading.client import TradingClient
 from alpaca.data.live import StockDataStream
 from alpaca.data.models.bars import Bar
-from alpaca.trading.models import Clock as AlpacaClock
-from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
+from alpaca.trading.models import Clock as AlpacaClock, Order as AlpacaOrder
+from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest, GetOrdersRequest
 from alpaca.trading import enums as AlpacaTradingEnums
 from alpaca.common.exceptions import APIError
 
@@ -271,7 +271,7 @@ class Alpaca(ConnectorTemplate):
 
         # Format order data into a model
         outputModel = BaseOrderResult(
-            order_id            = str(queriedOrder.id),
+                order_id                = str(queriedOrder.id),
                 created_at          = queriedOrder.created_at,
                 updated_at          = queriedOrder.updated_at,
                 submitted_at        = queriedOrder.submitted_at,
@@ -315,9 +315,48 @@ class Alpaca(ConnectorTemplate):
         # The loop terminated without returning, continue with cancellation
         self.clients["trading"].cancel_order_by_id(order_id=orderId)
         return True
+    
+    def _orderToModel(self, order: AlpacaOrder) -> BaseOrderResult:
+        # Convert AlpacaOrder to JSON string
+        jsonStr = order.model_dump_json()
 
-    def currentOrder(self):
-        pass
+        # Convert enums
+        orderSideResult = self._orderSideMatcher(order.side)
+
+        # Format order data into a model
+        return BaseOrderResult(
+                order_id                = str(order.id),
+                created_at          = order.created_at,
+                updated_at          = order.updated_at,
+                submitted_at        = order.submitted_at,
+                filled_at           = order.filled_at,
+                expired_at          = order.expired_at,
+                expires_at          = order.expires_at,
+                canceled_at         = order.canceled_at,
+                failed_at           = order.failed_at,
+                asset_id            = str(order.asset_id),
+                symbol              = order.symbol,
+                notional            = order.notional,
+                qty                 = order.qty,
+                filled_qty          = order.filled_qty,
+                filled_avg_price    = order.filled_avg_price,
+                # Enums
+                side                = orderSideResult,
+                type                = order.type,
+                time_in_force       = order.time_in_force,
+                status              = order.status,
+                # Raw response as a json string
+                raw                 = jsonStr)
+
+    def currentOrder(self) -> list[BaseOrderResult]:
+        # Filter for open orders only
+        queryFilters = GetOrdersRequest(status=AlpacaTradingEnums.QueryOrderStatus.OPEN)
+        # Execute query
+        ordersList: list[AlpacaOrder] = self.clients["trading"].get_orders(filter=queryFilters)
+        # Iterate through and format them into models
+        output: list[BaseOrderResult] = [self._orderToModel(currentOrder) for currentOrder in ordersList]
+        # Return formatted list
+        return output
 
     def getAllOrders(self):
         pass
