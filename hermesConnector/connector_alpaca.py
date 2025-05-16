@@ -349,12 +349,17 @@ class Alpaca(ConnectorTemplate):
                 raw                 = jsonStr)
 
     def currentOrder(self) -> list[BaseOrderResult]:
-        # Filter for open orders only
-        queryFilters = GetOrdersRequest(status=AlpacaTradingEnums.QueryOrderStatus.OPEN)
+        # Filter for open orders and orders of the current symbol only
+        queryFilters = GetOrdersRequest(
+            status=AlpacaTradingEnums.QueryOrderStatus.OPEN,
+            symbols=[self.options.tradingPair])
+
         # Execute query
         ordersList: list[AlpacaOrder] = self.clients["trading"].get_orders(filter=queryFilters)
+
         # Iterate through and format them into models
         output: list[BaseOrderResult] = [self._orderToModel(currentOrder) for currentOrder in ordersList]
+
         # Return formatted list
         return output
 
