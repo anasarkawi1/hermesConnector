@@ -38,3 +38,9 @@ class OrderStatus(str, Enum):
     SUSPENDED               = "suspended"
     CALCULATED              = "calculated"
     HELD                    = "held"
+
+class Timeframe(str, Enum):
+    WEEK                    = "week"
+    DAY                     = "day"
+    HOUR                    = "hour"
+    MINUTE                  = "minute"

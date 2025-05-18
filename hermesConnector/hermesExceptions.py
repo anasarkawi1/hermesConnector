@@ -9,6 +9,7 @@ genericErrStr = Literal[
     "REQUEST_TIMEOUT"
     "AUTHORISATION_FAILED",
     "INSUFFICIENT_PARAMETERS",
+    "NON_STANDARD_PARAMETER_GIVEN",
 ]
 orderErrStr = Literal[
     "UNKNOWN_ORDER_ERR",
@@ -70,6 +71,10 @@ class RequestTimeout(HermesBaseException):
 class HandlerNonExistent(HermesBaseException):
     errCode     = 1009
     errStr      = "WS_HANDLER_NX"
+
+class NonStandardInput(HermesBaseException):
+    errCode     = 1010
+    errStr      = "NON_STANDARD_PARAMETER_GIVEN"
 
 #
 # Order errors 

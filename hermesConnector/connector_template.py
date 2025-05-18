@@ -8,11 +8,12 @@ import typing_extensions as typing
 
 from hermesConnector.models import BaseOrderResult, ClockReturnModel, MarketOrderQtyParams, MarketOrderResult
 from hermesConnector.models_utilities import HermesBaseModel
+from hermes_enums import Timeframe
 
 
 class ConnectorOptions(HermesBaseModel):
     tradingPair         : str
-    interval            : str
+    interval            : Timeframe
     limit               : str
     mode                : str
     columns             : typing.Optional[any]

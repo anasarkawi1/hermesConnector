@@ -3,22 +3,31 @@
 
 
 # Load modules
-from .hermesExceptions import InsufficientParameters, HandlerNonExistent, UnknownGenericHermesException
+from datetime import datetime
+
+from .hermesExceptions import InsufficientParameters, HandlerNonExistent, NonStandardInput, UnknownGenericHermesException
 from .connector_template import ConnectorTemplate
 
 # Alpaca Imports
 from alpaca.trading.client import TradingClient
-from alpaca.data.live import StockDataStream
 from alpaca.data.models.bars import Bar
-from alpaca.trading.models import Clock as AlpacaClock, Order as AlpacaOrder
+from alpaca.trading.models import Clock as AlpacaClock, Order as AlpacaOrder, Asset as AlpacaAsset
 from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest, GetOrdersRequest
 from alpaca.trading import enums as AlpacaTradingEnums
 from alpaca.common.exceptions import APIError
+# Data Clients
+from alpaca.data.historical.stock import StockHistoricalDataClient
+from alpaca.data.historical.option import OptionHistoricalDataClient
+from alpaca.data.historical.crypto import CryptoHistoricalDataClient
+# Live Data Clients
+from alpaca.data.live import StockDataStream, OptionDataStream, CryptoDataStream
+# Historical data request models
+from alpaca.data import StockBarsRequest, OptionBarsRequest, CryptoBarsRequest, TimeFrame as AlpacaTimeFrame
 
 from .models import BaseOrderResult, ClockReturnModel, LimitOrderBaseParams, LimitOrderResult, OrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
 
 # TODO: Tidy this up. Put all the imports inside a single reference instead of individual imports
-from .hermes_enums import TimeInForce as HermesTIF, OrderSide as HermesOrderSide, OrderStatus as HermesOrderStatus
+from .hermes_enums import TimeInForce as HermesTIF, OrderSide as HermesOrderSide, OrderStatus as HermesOrderStatus, Timeframe as HermesTimeframe
 
 
 
@@ -52,16 +61,63 @@ class Alpaca(ConnectorTemplate):
             client = TradingClient(self.options.credentials[0], self.options.credentials[1], paper=True)
         
         # Clients dictionary
-        self.clients: dict[str, TradingClient | StockDataStream] = {
+        # The "ws" and "historical" elements hold the real-time and historical data streams respectively. Since Alpaca's Python SDK seperates each asset class into its own data class, these elements are populated later.
+        # TODO: The type hinting here is obnoxious...
+        self.clients: dict[str, None | TradingClient | StockDataStream | StockHistoricalDataClient | OptionHistoricalDataClient | CryptoHistoricalDataClient] = {
             "trading"       : client,
-            "ws"            : None
+            "ws"            : None,
+            "historical"    : None
         }
 
-        # Initialise WS client
+        # TODO: Implement Stream and HistoricDataClient selection here
+        # Get asset info
+        assetInfo = self._getAssetInfo(assetNameOrId=self.options.tradingPair)
+        self._assetClass = assetInfo.asset_class
+        historicDataClient = None
+        realTimeDataClient = None
+
+        # Also assign a standard model for requests
+        historicalDataRequestModel = None
+
+        # Determine if the target asset is a stock, options contract, or a cryptocurrency
+        match self._assetClass:
+            case AlpacaTradingEnums.AssetClass.US_EQUITY:
+                historicDataClient = StockHistoricalDataClient(
+                    api_key=self.options.credentials[0],
+                    secret_key=self.options.credentials[1])
+                realTimeDataClient = StockDataStream(
+                    api_key=self.options.credentials[0],
+                    secret_key=self.options.credentials[1])
+                historicalDataRequestModel = StockBarsRequest
+            case AlpacaTradingEnums.AssetClass.US_OPTION:
+                historicDataClient = OptionHistoricalDataClient(
+                    api_key=self.options.credentials[0],
+                    secret_key=self.options.credentials[1])
+                realTimeDataClient = OptionDataStream(
+                    api_key=self.options.credentials[0],
+                    secret_key=self.options.credentials[1])
+                historicalDataRequestModel = OptionBarsRequest
+            case AlpacaTradingEnums.AssetClass.CRYPTO:
+                historicDataClient = CryptoHistoricalDataClient()
+                realTimeDataClient = CryptoDataStream(
+                    api_key=self.options.credentials[0],
+                    secret_key=self.options.credentials[1])
+                historicalDataRequestModel = CryptoBarsRequest
+            case _:
+                raise NonStandardInput
+        
+        # Populate the clients dictionary and request data model fields
+        self.clients["historical"] = historicDataClient
+        self.historicalDataRequestModel = historicalDataRequestModel
+        # Check if a data handler was supplied. Else, don't assign the real time client
         if self.options.dataHandler != None:
-            self.clients["ws"] = StockDataStream(
-                self.options.credentials[0],
-                self.options.credentials[1])
+            self.clients["ws"] = realTimeDataClient
+        
+        self.dataClients: dict[str, StockHistoricalDataClient | OptionHistoricalDataClient | CryptoHistoricalDataClient] = {
+            "stocks"        : None,
+            "options"       : None,
+            "crypto"        : None
+        }
     
     def exchangeClock(self) -> ClockReturnModel:
         currentTime: AlpacaClock = self.clients["trading"].get_clock()
@@ -377,9 +433,45 @@ class Alpaca(ConnectorTemplate):
 
         # Return formatted list
         return output
+    
+    # TODO: Should this be a standard method for all connectors, instead of a private utility method?
+    def _getAssetInfo(self, assetNameOrId) -> AlpacaAsset:
+        return self.clients["trading"].get_asset(symbol_or_asset_id=assetNameOrId)
+    
+    def _convertTimeFrame(self, timeframe: HermesTimeframe) -> AlpacaTimeFrame:
+        match timeframe:
+            case HermesTimeframe.WEEK:
+                return AlpacaTimeFrame.Week
+            case HermesTimeframe.DAY:
+                return AlpacaTimeFrame.Day
+            case HermesTimeframe.HOUR:
+                return AlpacaTimeFrame.Hour
+            case HermesTimeframe.MINUTE:
+                return AlpacaTimeFrame.Minute
+            case _:
+                raise NonStandardInput
 
     def historicData(self):
-        pass
+        rawBarsReponse = None
+        reqTimeframe = self._convertTimeFrame(self.options.interval)
+        reqStartDate = datetime(1990, 1, 1)
+        match self._assetClass:
+            case AlpacaTradingEnums.AssetClass.US_EQUITY:
+                # TODO: Add calculations regarding the start and end date through number of bars requested.
+                reqModel = StockBarsRequest(
+                    symbol_or_symbols=self.options.tradingPair,
+                    timeframe=reqTimeframe,
+                    start=reqStartDate,
+                    limit=self.options.limit)
+                rawBarsReponse = self.clients["historical"].get_stock_bars(reqModel)
+                # Do something here
+            case AlpacaTradingEnums.AssetClass.US_OPTION:
+                rawBarsReponse = self.clients["historical"].get_option_bars()
+            case AlpacaTradingEnums.AssetClass.CRYPTO:
+                self.clients["historical"].get_crypto_bars()
+            case _:
+                raise NonStandardInput
+        
 
     def initiateLiveData(self):
         # Check if an handler was provided
