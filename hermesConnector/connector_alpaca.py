@@ -3,9 +3,11 @@
 
 
 # Load modules
-from datetime import datetime
+from datetime import datetime, timedelta
+import pandas as pd
+from dateutil.relativedelta import relativedelta
 
-from .hermesExceptions import InsufficientParameters, HandlerNonExistent, NonStandardInput, UnknownGenericHermesException
+from .hermesExceptions import InsufficientParameters, HandlerNonExistent, NonStandardInput, UnexpectedOutputType, UnknownGenericHermesException, UnsupportedParameterValue
 from .connector_template import ConnectorTemplate
 
 # Alpaca Imports
@@ -22,7 +24,7 @@ from alpaca.data.historical.crypto import CryptoHistoricalDataClient
 # Live Data Clients
 from alpaca.data.live import StockDataStream, OptionDataStream, CryptoDataStream
 # Historical data request models
-from alpaca.data import StockBarsRequest, OptionBarsRequest, CryptoBarsRequest, TimeFrame as AlpacaTimeFrame
+from alpaca.data import StockBarsRequest, OptionBarsRequest, CryptoBarsRequest, TimeFrame as AlpacaTimeFrame, TimeFrameUnit as AlpacaTimeFrameUnit, BarSet as AlpacaBarSet, RawData as AlpacaRawData
 
 from .models import BaseOrderResult, ClockReturnModel, LimitOrderBaseParams, LimitOrderResult, OrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
 
@@ -113,11 +115,9 @@ class Alpaca(ConnectorTemplate):
         if self.options.dataHandler != None:
             self.clients["ws"] = realTimeDataClient
         
-        self.dataClients: dict[str, StockHistoricalDataClient | OptionHistoricalDataClient | CryptoHistoricalDataClient] = {
-            "stocks"        : None,
-            "options"       : None,
-            "crypto"        : None
-        }
+        # Declare a start date for historical data
+        # The date is way back in the past (30 years by default) to allow for the limit parameter to take priority
+        self._historicalDataStartDate = datetime.now() - timedelta(weeks=(52 * 30))
     
     def exchangeClock(self) -> ClockReturnModel:
         currentTime: AlpacaClock = self.clients["trading"].get_clock()
@@ -451,27 +451,98 @@ class Alpaca(ConnectorTemplate):
             case _:
                 raise NonStandardInput
 
+    def _endDateConverter(self, startDate: datetime, tf: AlpacaTimeFrame):
+        endDate = None
+        match tf.unit:
+            case AlpacaTimeFrameUnit.Hour:
+                offsetDelta = relativedelta(hours=tf.amount)
+                endDate = startDate + offsetDelta
+            case AlpacaTimeFrameUnit.Minute:
+                offsetDelta = relativedelta(minutes=tf.amount)
+                endDate = startDate + offsetDelta
+            case AlpacaTimeFrameUnit.Day:
+                offsetDelta = relativedelta(days=tf.amount)
+                endDate = startDate + offsetDelta
+            case AlpacaTimeFrameUnit.Week:
+                offsetDelta = relativedelta(weeks=tf.amount)
+                endDate = startDate + offsetDelta
+            case AlpacaTimeFrameUnit.Month:
+                offsetDelta = relativedelta(months=tf.amount)
+                endDate = startDate + offsetDelta
+            case _:
+                raise UnsupportedParameterValue
+        
+        if endDate != None:
+            return endDate
+    
+    def _rollingFuncCloseTimeConverter(self, startDate):
+        return self._endDateConverter(startDate=startDate, tf=self.__requestAlpacaTimeFrame)
+
     def historicData(self):
-        rawBarsReponse = None
+        rawBarsResponse: None | AlpacaBarSet | AlpacaRawData = None
         reqTimeframe = self._convertTimeFrame(self.options.interval)
-        reqStartDate = datetime(1990, 1, 1)
+        self._requestAlpacaTimeFrame = reqTimeframe
+        reqStartDate = self._historicalDataStartDate
+
+        # Construct and initiate data request
         match self._assetClass:
             case AlpacaTradingEnums.AssetClass.US_EQUITY:
-                # TODO: Add calculations regarding the start and end date through number of bars requested.
                 reqModel = StockBarsRequest(
                     symbol_or_symbols=self.options.tradingPair,
                     timeframe=reqTimeframe,
                     start=reqStartDate,
                     limit=self.options.limit)
-                rawBarsReponse = self.clients["historical"].get_stock_bars(reqModel)
+                rawBarsResponse = self.clients["historical"].get_stock_bars(reqModel)
                 # Do something here
             case AlpacaTradingEnums.AssetClass.US_OPTION:
-                rawBarsReponse = self.clients["historical"].get_option_bars()
+                reqModel = OptionBarsRequest(
+                    symbol_or_symbols=self.options.tradingPair,
+                    timeframe=reqTimeframe,
+                    start=reqStartDate,
+                    limit=self.options.limit)
+                rawBarsResponse = self.clients["historical"].get_option_bars(reqModel)
             case AlpacaTradingEnums.AssetClass.CRYPTO:
-                self.clients["historical"].get_crypto_bars()
+                reqModel = CryptoBarsRequest(
+                    symbol_or_symbols=self.options.tradingPair,
+                    timeframe=reqTimeframe,
+                    start=reqStartDate,
+                    limit=self.options.limit)
+                rawBarsResponse = self.clients["historical"].get_crypto_bars(reqModel)
             case _:
                 raise NonStandardInput
         
+        # Process the recieved data
+        if (isinstance(rawBarsResponse, AlpacaBarSet) != True) or (isinstance(rawBarsResponse, AlpacaRawData)):
+            raise UnexpectedOutputType
+        
+        # Convert BarSet to a pandas DataFrame and process it
+        rawDataFrame: pd.DataFrame = rawBarsResponse.df
+        # Reset the `symbol` index
+        rawDataFrame.reset_index("symbol", inplace=True)
+        # Drop the `symbol` column
+        rawDataFrame.drop("symbol", axis=1, inplace=True)
+
+        # TODO: Convert into the usual hermes format DataFrame
+        # Since we already have a DataFrame at hand, it would be pointless to create a new one.
+        # Instead, all the extra columns can be dropped, missing ones can be added, and the existing ones can be named properly.
+        # It seems like most of the columns are already there and named correctly anyways, with only the pChange column missing.
+
+        # Drop the extra columns
+        rawDataFrame.drop(["trade_count", "vwap"], axis=1, inplace=True)
+        # Rename columns
+        rawDataFrame.rename(columns={
+            "timestamp": "openTime"
+        }, inplace=True)
+        # Calculate percent change of the close prices
+        rawDataFrame["pChange"] = (rawDataFrame["close"].pct_change) * 100
+
+        # Generate closing times through the open times
+        # Problem: Alpaca doesn't return closing times. Thus, we need to take the opening times and add the offset of the candlestick
+        # The question: How should we infer the offset? We can either take the Timeframe parameter from the original request directly, or get the offset through the already existing data points (n, n-1).
+        # The n, n+1 appraoch fails in the edgecase when only a single candlestick is available
+        # Better solution: Instead of relying on other candlesticks, inputting the Timeframe directly and then using that to generate a `relativedelta` seems to be the most sensible option.
+        rawDataFrame["closeTime"] = rawDataFrame["openTime"].apply(self._rollingFuncCloseTimeConverter)
+
 
     def initiateLiveData(self):
         # Check if an handler was provided

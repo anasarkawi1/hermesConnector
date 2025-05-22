@@ -10,6 +10,8 @@ genericErrStr = Literal[
     "AUTHORISATION_FAILED",
     "INSUFFICIENT_PARAMETERS",
     "NON_STANDARD_PARAMETER_GIVEN",
+    "UNEXPECTED_OUTPUT_TYPE",
+    "UNSUPPORTED_PARAMETER_INPUT"
 ]
 orderErrStr = Literal[
     "UNKNOWN_ORDER_ERR",
@@ -75,6 +77,14 @@ class HandlerNonExistent(HermesBaseException):
 class NonStandardInput(HermesBaseException):
     errCode     = 1010
     errStr      = "NON_STANDARD_PARAMETER_GIVEN"
+
+class UnexpectedOutputType(HermesBaseException):
+    errCode     = 1011
+    errStr      = "UNEXPECTED_OUTPUT_TYPE"
+
+class UnsupportedParameterValue(HermesBaseException):
+    errCode     = 1012
+    errStr      = "UNSUPPORTED_PARAMETER_INPUT"
 
 #
 # Order errors 
