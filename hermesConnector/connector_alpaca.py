@@ -453,25 +453,22 @@ class Alpaca(ConnectorTemplate):
 
     def _endDateConverter(self, startDate: datetime, tf: AlpacaTimeFrame):
         endDate = None
+        offsetDelta = None
         match tf.unit:
             case AlpacaTimeFrameUnit.Hour:
                 offsetDelta = relativedelta(hours=tf.amount)
-                endDate = startDate + offsetDelta
             case AlpacaTimeFrameUnit.Minute:
                 offsetDelta = relativedelta(minutes=tf.amount)
-                endDate = startDate + offsetDelta
             case AlpacaTimeFrameUnit.Day:
                 offsetDelta = relativedelta(days=tf.amount)
-                endDate = startDate + offsetDelta
             case AlpacaTimeFrameUnit.Week:
                 offsetDelta = relativedelta(weeks=tf.amount)
-                endDate = startDate + offsetDelta
             case AlpacaTimeFrameUnit.Month:
                 offsetDelta = relativedelta(months=tf.amount)
-                endDate = startDate + offsetDelta
             case _:
                 raise UnsupportedParameterValue
         
+        endDate = startDate + offsetDelta
         if endDate != None:
             return endDate
     
