@@ -575,5 +575,10 @@ class Alpaca(ConnectorTemplate):
             volume=data)
         
         # TODO: Determine if the current candlestick is new
+        # Check the last recorded timestamp against the newly recieved one. If the newly recieved one is higher, a new candlestick had opened.
+        candlestickOpened = False
+        if (self._lastLiveTimestamp < openTimeEpoch):
+            candlestickOpened = True
+        self._lastLiveTimestamp = openTimeEpoch
         
-        self.options["dataHandler"](data=formattedBar)
+        self.options["dataHandler"](data=formattedBar, closed=candlestickOpened)
