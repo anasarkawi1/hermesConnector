@@ -6,6 +6,7 @@
 from datetime import datetime, timedelta
 import pandas as pd
 from dateutil.relativedelta import relativedelta
+from datetime import timezone
 
 from .hermesExceptions import InsufficientParameters, HandlerNonExistent, NonStandardInput, UnexpectedOutputType, UnknownGenericHermesException, UnsupportedParameterValue
 from .connector_template import ConnectorTemplate
@@ -26,7 +27,7 @@ from alpaca.data.live import StockDataStream, OptionDataStream, CryptoDataStream
 # Historical data request models
 from alpaca.data import StockBarsRequest, OptionBarsRequest, CryptoBarsRequest, TimeFrame as AlpacaTimeFrame, TimeFrameUnit as AlpacaTimeFrameUnit, BarSet as AlpacaBarSet, RawData as AlpacaRawData
 
-from .models import BaseOrderResult, ClockReturnModel, LimitOrderBaseParams, LimitOrderResult, OrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
+from .models import BaseOrderResult, ClockReturnModel, LimitOrderBaseParams, LimitOrderResult, LiveMarketData, OrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
 
 # TODO: Tidy this up. Put all the imports inside a single reference instead of individual imports
 from .hermes_enums import TimeInForce as HermesTIF, OrderSide as HermesOrderSide, OrderStatus as HermesOrderStatus, Timeframe as HermesTimeframe
@@ -98,6 +99,7 @@ class Alpaca(ConnectorTemplate):
                 realTimeDataClient = OptionDataStream(
                     api_key=self.options.credentials[0],
                     secret_key=self.options.credentials[1])
+                print("[HermesConnector - INFO]: Currently, options trading is yet to be completely implemented. Usage of Hermes methods for options trading could lead to undefined behaviour.")
                 historicalDataRequestModel = OptionBarsRequest
             case AlpacaTradingEnums.AssetClass.CRYPTO:
                 historicDataClient = CryptoHistoricalDataClient()
@@ -555,5 +557,23 @@ class Alpaca(ConnectorTemplate):
         # Start WS client
         self.clients["ws"].run()
 
-    def wsHandlerInternal():
-        pass
+    def wsHandlerInternal(self, data: Bar) -> None:
+        # Calculate epoch for the open time
+        openTimeEpoch = (data.timestamp.replace(tzinfo=timezone.utc).timestamp() * 1000)
+
+        # Calculate epoch for the close time        
+        closeTime = self._endDateConverter(startDate=data.timestamp, tf=self._requestAlpacaTimeFrame)
+        closeTimeEpoch = (closeTime.replace(tzinfo=timezone.utc).timestamp() * 1000)
+        
+        formattedBar: LiveMarketData = LiveMarketData(
+            openTime=openTimeEpoch,
+            openPrice=data,
+            highPrice=data,
+            lowPrice=data,
+            closePrice=data,
+            closeTime=closeTimeEpoch,
+            volume=data)
+        
+        # TODO: Determine if the current candlestick is new
+        
+        self.options["dataHandler"](data=formattedBar)

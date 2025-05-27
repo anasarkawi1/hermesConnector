@@ -133,4 +133,7 @@ class ConnectorTemplate(ABC):
 
     @abstractmethod
     def wsHandlerInternal(self):
+        """
+            Handles the raw data of the order and passes
+        """
         pass

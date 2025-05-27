@@ -68,3 +68,36 @@ class MarketOrderResult(BaseOrderResult):
 
 class LimitOrderResult(BaseOrderResult):
     pass
+
+
+#
+# Market Data Models
+#
+
+class BaseMarketData(HermesBaseModel):
+
+    """
+
+        Base market data model containing all the fields of a market candlestick.
+
+            Attributes:
+            ----------
+                openTime        (float)   : Open time for the candlestick in epoch milliseconds.
+                openPrice       (float) : Open price for the candlestick.
+                highPrice       (float) : High price for the candlestick.
+                lowPrice        (float) : Low price for the candlestick.
+                closePrice      (float) : Close price for the candlestick.
+                closeTime       (float)   : Close time for the candlestick in epoch milliseconds.
+                volume          (float) : Trade volume for the candlestick.
+    """
+
+    openTime        : float
+    openPrice       : float
+    highPrice       : float
+    lowPrice        : float
+    closePrice      : float
+    closeTime       : float
+    volume          : float
+
+class LiveMarketData(BaseMarketData):
+    pass
