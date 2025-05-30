@@ -7,8 +7,9 @@ from datetime import datetime, timedelta
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from datetime import timezone
+from typing import Union, Dict, Tuple
 
-from .hermesExceptions import InsufficientParameters, HandlerNonExistent, NonStandardInput, UnexpectedOutputType, UnknownGenericHermesException, UnsupportedParameterValue
+from .hermesExceptions import InsufficientParameters, HandlerNonExistent, NonStandardInput, TargetClientInitiationError, UnexpectedInput, UnexpectedOutputType, UnknownGenericHermesException, UnsupportedParameterValue
 from .connector_template import ConnectorTemplate
 
 # Alpaca Imports
@@ -66,11 +67,16 @@ class Alpaca(ConnectorTemplate):
         # Clients dictionary
         # The "ws" and "historical" elements hold the real-time and historical data streams respectively. Since Alpaca's Python SDK seperates each asset class into its own data class, these elements are populated later.
         # TODO: The type hinting here is obnoxious...
-        self.clients: dict[str, None | TradingClient | StockDataStream | StockHistoricalDataClient | OptionHistoricalDataClient | CryptoHistoricalDataClient] = {
+        self.clients: dict[str, None | TradingClient | StockDataStream | OptionDataStream | CryptoDataStream | StockHistoricalDataClient | OptionHistoricalDataClient | CryptoHistoricalDataClient] = {
             "trading"       : client,
             "ws"            : None,
             "historical"    : None
         }
+
+        if (client != None):
+            self._tradingClient: TradingClient = client
+        else:
+            raise TargetClientInitiationError
 
         # TODO: Implement Stream and HistoricDataClient selection here
         # Get asset info
@@ -116,28 +122,33 @@ class Alpaca(ConnectorTemplate):
         # Check if a data handler was supplied. Else, don't assign the real time client
         if self.options.dataHandler != None:
             self.clients["ws"] = realTimeDataClient
+            self._wsClient = realTimeDataClient
         
         # Declare a start date for historical data
         # The date is way back in the past (30 years by default) to allow for the limit parameter to take priority
         self._historicalDataStartDate = datetime.now() - timedelta(weeks=(52 * 30))
     
     def exchangeClock(self) -> ClockReturnModel:
-        currentTime: AlpacaClock = self.clients["trading"].get_clock()
-        return ClockReturnModel(
-            isOpen=currentTime.is_open,
-            nextOpen=currentTime.next_open,
-            nextClose=currentTime.next_close,
-            currentTimestamp=currentTime.timestamp)
+        currentTime: Union[AlpacaClock, AlpacaRawData] = self._tradingClient.get_clock()
+        # To appease the Pylance, check if the type is of Dict, the base type for Alpaca's RawData type.
+        if (isinstance(currentTime, Dict)):
+            raise UnexpectedOutputType
+        else:
+            return ClockReturnModel(
+                isOpen=currentTime.is_open,
+                nextOpen=currentTime.next_open,
+                nextClose=currentTime.next_close,
+                currentTimestamp=currentTime.timestamp)
 
     def stop(self) -> None:
-        self.clients["trading"].stop()
+        self._wsClient.stop()
 
     def account(self):
         pass
 
     def _orderParamConstructor(
             self,
-            orderParams: OrderBaseParams) -> list[AlpacaTradingEnums.OrderSide, AlpacaTradingEnums.TimeInForce]:
+            orderParams: OrderBaseParams) -> Tuple[AlpacaTradingEnums.OrderSide, AlpacaTradingEnums.TimeInForce]:
         
         """
             Returns an array containing the exchange specific "Order Side" and "Time in Force" parameters of an order.
@@ -149,7 +160,7 @@ class Alpaca(ConnectorTemplate):
 
             Returns
             -------
-                list[AlpacaTradingEnums.OrderSide, AlpacaTradingEnums.TimeInForce]
+                Tuple[AlpacaTradingEnums.OrderSide, AlpacaTradingEnums.TimeInForce]
         """
 
         orderSide       = None
@@ -174,7 +185,7 @@ class Alpaca(ConnectorTemplate):
             case _:
                 raise InsufficientParameters
 
-        return [orderSide, tifEnum]
+        return (orderSide, tifEnum)
 
     def _orderSideMatcher(self, orderSide: AlpacaTradingEnums.OrderSide):
         orderSideResult = None
@@ -193,14 +204,28 @@ class Alpaca(ConnectorTemplate):
         
         # Submit order
         try:
-            orderResult = self.clients["trading"].submit_order(order_data=reqModel)
+            orderResult = self._tradingClient.submit_order(order_data=reqModel)
+            if(isinstance(orderResult, Dict)):
+                raise UnexpectedOutputType
+            
             # Generate JSON string of the exchange response
             jsonStr = orderResult.model_dump_json()
 
             # Match order side to its Hermes enum
+            if (orderResult.side == None):
+                raise UnexpectedInput
             orderSideResult = self._orderSideMatcher(orderResult.side)
 
             # Generate output
+            if (
+                orderResult.qty                     == None or
+                orderResult.filled_qty              == None or
+                orderResult.filled_avg_price        == None or
+                orderResult.type                    == None or
+                orderResult.time_in_force           == None or
+                orderResult.status                  == None
+                ):
+                raise UnexpectedOutputType
             output = MarketOrderResult(
                 order_id            = str(orderResult.id),
                 created_at          = orderResult.created_at,
@@ -214,14 +239,14 @@ class Alpaca(ConnectorTemplate):
                 asset_id            = str(orderResult.asset_id),
                 symbol              = orderResult.symbol,
                 notional            = orderResult.notional,
-                qty                 = orderResult.qty,
-                filled_qty          = orderResult.filled_qty,
-                filled_avg_price    = orderResult.filled_avg_price,
+                qty                 = float(orderResult.qty),
+                filled_qty          = float(orderResult.filled_qty),
+                filled_avg_price    = float(orderResult.filled_avg_price),
                 # Enums
                 side                = orderSideResult,
-                type                = orderResult.type,
-                time_in_force       = orderResult.time_in_force,
-                status              = orderResult.status,
+                type                = str(orderResult.type),
+                time_in_force       = str(orderResult.time_in_force),
+                status              = str(orderResult.status),
                 # Raw response as a json string
                 raw                 = jsonStr)
             
@@ -264,15 +289,29 @@ class Alpaca(ConnectorTemplate):
     def _limitOrderSubmit(self, reqModel: LimitOrderRequest) -> LimitOrderResult:
         # Submit order
         try:
-            orderResult = self.clients["trading"].submit_order(reqModel)
+            orderResult = self._tradingClient.submit_order(reqModel)
+            if(isinstance(orderResult, Dict)):
+                raise UnexpectedOutputType
 
             # Generate JSON string from exchange response
             jsonStr = orderResult.model_dump_json()
 
             # Match order side to its hermes enum
+            if (orderResult.side == None):
+                raise UnexpectedInput
             orderSideResult = self._orderSideMatcher(orderResult.side)
 
             # TODO: Make the result for the order (probably similar to the market order.)
+            if (
+                orderResult.qty                     == None or
+                orderResult.filled_qty              == None or
+                orderResult.filled_avg_price        == None or
+                orderResult.type                    == None or
+                orderResult.time_in_force           == None or
+                orderResult.status                  == None or
+                orderResult.limit_price             == None
+                ):
+                raise UnexpectedOutputType
             output = LimitOrderResult(
                 order_id            = str(orderResult.id),
                 created_at          = orderResult.created_at,
@@ -286,16 +325,16 @@ class Alpaca(ConnectorTemplate):
                 asset_id            = str(orderResult.asset_id),
                 symbol              = orderResult.symbol,
                 notional            = orderResult.notional,
-                qty                 = orderResult.qty,
-                filled_qty          = orderResult.filled_qty,
-                filled_avg_price    = orderResult.filled_avg_price,
+                qty                 = float(orderResult.qty),
+                filled_qty          = float(orderResult.filled_qty),
+                filled_avg_price    = float(orderResult.filled_avg_price),
                 # Enums
                 side                = orderSideResult,
-                type                = orderResult.type,
-                time_in_force       = orderResult.time_in_force,
-                status              = orderResult.status,
+                type                = str(orderResult.type),
+                time_in_force       = str(orderResult.time_in_force),
+                status              = str(orderResult.status),
                 # Limit order specific
-                limit_price         = orderResult.limit_price,
+                limit_price         = float(orderResult.limit_price),
                 # Raw response as a json string
                 raw                 = jsonStr)
             return output
@@ -319,15 +358,29 @@ class Alpaca(ConnectorTemplate):
 
     def queryOrder(self, orderId: str) -> BaseOrderResult:
         # Query order
-        queriedOrder = self.clients["trading"].get_order_by_id(order_id=orderId)
+        queriedOrder = self._tradingClient.get_order_by_id(order_id=orderId)
+        if(isinstance(queriedOrder, Dict)):
+                raise UnexpectedOutputType
 
         # Convert to JSON string
         jsonStr = queriedOrder.model_dump_json()
 
         # Convert enums
+        if (queriedOrder.side == None):
+                raise UnexpectedInput
         orderSideResult = self._orderSideMatcher(queriedOrder.side)
 
         # Format order data into a model
+        if (
+                queriedOrder.qty                     == None or
+                queriedOrder.filled_qty              == None or
+                queriedOrder.filled_avg_price        == None or
+                queriedOrder.type                    == None or
+                queriedOrder.time_in_force           == None or
+                queriedOrder.status                  == None or
+                queriedOrder.limit_price             == None
+                ):
+                raise UnexpectedOutputType
         outputModel = BaseOrderResult(
                 order_id                = str(queriedOrder.id),
                 created_at          = queriedOrder.created_at,
@@ -341,14 +394,14 @@ class Alpaca(ConnectorTemplate):
                 asset_id            = str(queriedOrder.asset_id),
                 symbol              = queriedOrder.symbol,
                 notional            = queriedOrder.notional,
-                qty                 = queriedOrder.qty,
-                filled_qty          = queriedOrder.filled_qty,
-                filled_avg_price    = queriedOrder.filled_avg_price,
+                qty                 = float(queriedOrder.qty),
+                filled_qty          = float(queriedOrder.filled_qty),
+                filled_avg_price    = float(queriedOrder.filled_avg_price),
                 # Enums
                 side                = orderSideResult,
-                type                = queriedOrder.type,
-                time_in_force       = queriedOrder.time_in_force,
-                status              = queriedOrder.status,
+                type                = str(queriedOrder.type),
+                time_in_force       = str(queriedOrder.time_in_force),
+                status              = str(queriedOrder.status),
                 # Raw response as a json string
                 raw                 = jsonStr)
         
@@ -371,7 +424,7 @@ class Alpaca(ConnectorTemplate):
                 return False
         
         # The loop terminated without returning, continue with cancellation
-        self.clients["trading"].cancel_order_by_id(order_id=orderId)
+        self._tradingClient.cancel_order_by_id(order_id=orderId)
         return True
     
     def _orderToModel(self, order: AlpacaOrder) -> BaseOrderResult:
@@ -379,9 +432,21 @@ class Alpaca(ConnectorTemplate):
         jsonStr = order.model_dump_json()
 
         # Convert enums
+        if (order.side == None):
+            raise UnexpectedOutputType
         orderSideResult = self._orderSideMatcher(order.side)
 
         # Format order data into a model
+        if (
+                order.qty                     == None or
+                order.filled_qty              == None or
+                order.filled_avg_price        == None or
+                order.type                    == None or
+                order.time_in_force           == None or
+                order.status                  == None or
+                order.limit_price             == None
+                ):
+                raise UnexpectedOutputType
         return BaseOrderResult(
                 order_id                = str(order.id),
                 created_at          = order.created_at,
@@ -395,16 +460,21 @@ class Alpaca(ConnectorTemplate):
                 asset_id            = str(order.asset_id),
                 symbol              = order.symbol,
                 notional            = order.notional,
-                qty                 = order.qty,
-                filled_qty          = order.filled_qty,
-                filled_avg_price    = order.filled_avg_price,
+                qty                 = float(order.qty),
+                filled_qty          = float(order.filled_qty),
+                filled_avg_price    = float(order.filled_avg_price),
                 # Enums
                 side                = orderSideResult,
-                type                = order.type,
-                time_in_force       = order.time_in_force,
-                status              = order.status,
+                type                = str(order.type),
+                time_in_force       = str(order.time_in_force),
+                status              = str(order.status),
                 # Raw response as a json string
                 raw                 = jsonStr)
+    
+    def _formattedOrderListGenerator(self, currentOrder: Union[AlpacaOrder, AlpacaRawData, str]) -> BaseOrderResult:
+        if (isinstance(currentOrder, Dict) or isinstance(currentOrder, str)):
+            raise UnexpectedOutputType
+        return self._orderToModel(currentOrder)
 
     def currentOrder(self) -> list[BaseOrderResult]:
         # Filter for open orders and orders of the current symbol only
@@ -413,10 +483,10 @@ class Alpaca(ConnectorTemplate):
             symbols=[self.options.tradingPair])
 
         # Execute query
-        ordersList: list[AlpacaOrder] = self.clients["trading"].get_orders(filter=queryFilters)
+        ordersList: Union[list[AlpacaOrder], AlpacaRawData] = self._tradingClient.get_orders(filter=queryFilters)
 
         # Iterate through and format them into models
-        output: list[BaseOrderResult] = [self._orderToModel(currentOrder) for currentOrder in ordersList]
+        output: list[BaseOrderResult] = [self._formattedOrderListGenerator(currentOrder=currentOrder) for currentOrder in ordersList]
 
         # Return formatted list
         return output
@@ -428,19 +498,23 @@ class Alpaca(ConnectorTemplate):
             symbols=[self.options.tradingPair])
 
         # Execute query
-        ordersList: list[AlpacaOrder] = self.clients["trading"].get_orders(filter=queryFilters)
+        ordersList: Union[list[AlpacaOrder], AlpacaRawData] = self._tradingClient.get_orders(filter=queryFilters)
 
         # Iterate through and format them into models
-        output: list[BaseOrderResult] = [self._orderToModel(currentOrder) for currentOrder in ordersList]
+        output: list[BaseOrderResult] = [self._formattedOrderListGenerator(currentOrder=currentOrder) for currentOrder in ordersList]
 
         # Return formatted list
         return output
     
     # TODO: Should this be a standard method for all connectors, instead of a private utility method?
     def _getAssetInfo(self, assetNameOrId) -> AlpacaAsset:
-        return self.clients["trading"].get_asset(symbol_or_asset_id=assetNameOrId)
+        output = self._tradingClient.get_asset(symbol_or_asset_id=assetNameOrId)
+        if (isinstance(output, Dict)):
+            raise UnexpectedOutputType
+        return output
     
     def _convertTimeFrame(self, timeframe: HermesTimeframe) -> AlpacaTimeFrame:
+        # TODO: Completely wrong, needs to be fixed. Currently, it tries to give the unit only, but also it retrieves that though the Alpaca's TimeFrame class, which by default yields an amount of 1 unit.
         match timeframe:
             case HermesTimeframe.WEEK:
                 return AlpacaTimeFrame.Week
@@ -490,7 +564,7 @@ class Alpaca(ConnectorTemplate):
                     symbol_or_symbols=self.options.tradingPair,
                     timeframe=reqTimeframe,
                     start=reqStartDate,
-                    limit=self.options.limit)
+                    limit=int(self.options.limit))
                 rawBarsResponse = self.clients["historical"].get_stock_bars(reqModel)
                 # Do something here
             case AlpacaTradingEnums.AssetClass.US_OPTION:
@@ -498,14 +572,14 @@ class Alpaca(ConnectorTemplate):
                     symbol_or_symbols=self.options.tradingPair,
                     timeframe=reqTimeframe,
                     start=reqStartDate,
-                    limit=self.options.limit)
+                    limit=int(self.options.limit))
                 rawBarsResponse = self.clients["historical"].get_option_bars(reqModel)
             case AlpacaTradingEnums.AssetClass.CRYPTO:
                 reqModel = CryptoBarsRequest(
                     symbol_or_symbols=self.options.tradingPair,
                     timeframe=reqTimeframe,
                     start=reqStartDate,
-                    limit=self.options.limit)
+                    limit=int(self.options.limit))
                 rawBarsResponse = self.clients["historical"].get_crypto_bars(reqModel)
             case _:
                 raise NonStandardInput

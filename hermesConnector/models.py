@@ -4,7 +4,7 @@
 from .hermes_enums import OrderSide, OrderStatus, OrderType, TimeInForce
 from .models_utilities import HermesBaseModel
 from datetime import datetime
-import typing_extensions as typing
+from typing import Optional, Union
 
 
 class ClockReturnModel(HermesBaseModel):
@@ -42,25 +42,25 @@ class BaseOrderResult(HermesBaseModel):
     created_at                  : datetime
     updated_at                  : datetime
     submitted_at                : datetime
-    filled_at                   : typing.Optional[datetime]
-    expired_at                  : typing.Optional[datetime]
-    expires_at                  : typing.Optional[datetime]
-    canceled_at                 : typing.Optional[datetime]
-    failed_at                   : typing.Optional[datetime]
-    asset_id                    : typing.Optional[str]
-    symbol                      : typing.Optional[str]
-    notional                    : typing.Optional[str]
-    qty                         : typing.Optional[float]
-    filled_qty                  : typing.Optional[float]
-    filled_avg_price            : typing.Optional[float]
-    type                        : typing.Optional[OrderType]
-    side                        : typing.Optional[OrderSide]
-    time_in_force               : TimeInForce
-    status                      : OrderStatus
-    limit_price                 : typing.Optional[float] = None
+    filled_at                   : Optional[datetime]
+    expired_at                  : Optional[datetime]
+    expires_at                  : Optional[datetime]
+    canceled_at                 : Optional[datetime]
+    failed_at                   : Optional[datetime]
+    asset_id                    : Optional[str]
+    symbol                      : Optional[str]
+    notional                    : Optional[str]
+    qty                         : Optional[float]
+    filled_qty                  : Optional[float]
+    filled_avg_price            : Optional[float]
+    type                        : Optional[Union[OrderType, str]]
+    side                        : Optional[Union[OrderSide, str]]
+    time_in_force               : Optional[Union[TimeInForce, str]]
+    status                      : Optional[Union[OrderStatus, str]]
+    limit_price                 : Optional[float] = None
 
     # Raw exchange response as a JSON string. Used for archival and redundancy reasons.
-    raw                         : typing.Union[str, any]
+    raw                         : str
 
 
 class MarketOrderResult(BaseOrderResult):

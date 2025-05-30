@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from hermesConnector.hermesExceptions import InsufficientParameters
 from datetime import datetime
 import typing_extensions as typing
+from typing import Optional, Any, Callable, Union
 
 from hermesConnector.models import BaseOrderResult, ClockReturnModel, MarketOrderQtyParams, MarketOrderResult
 from hermesConnector.models_utilities import HermesBaseModel
@@ -14,10 +15,10 @@ from hermes_enums import Timeframe
 class ConnectorOptions(HermesBaseModel):
     tradingPair         : str
     interval            : Timeframe
-    limit               : str
+    limit               : Union[str, int]
     mode                : str
-    columns             : typing.Optional[any]
-    dataHandler         : typing.Optional[callable]
+    columns             : Optional[Any]
+    dataHandler         : Optional[Callable]
     credentials         : list
 
 

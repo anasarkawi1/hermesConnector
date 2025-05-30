@@ -1,4 +1,5 @@
 from typing_extensions import Literal
+from typing import Union
 
 
 
@@ -6,12 +7,15 @@ genericErrStr = Literal[
     "UNKNOWN_ERR",
     "INTERNAL_CON_ERR",
     "TOO_MANY_REQUESTS",
-    "REQUEST_TIMEOUT"
+    "REQUEST_TIMEOUT",
+    "WS_HANDLER_NX",
     "AUTHORISATION_FAILED",
     "INSUFFICIENT_PARAMETERS",
     "NON_STANDARD_PARAMETER_GIVEN",
     "UNEXPECTED_OUTPUT_TYPE",
-    "UNSUPPORTED_PARAMETER_INPUT"
+    "UNSUPPORTED_PARAMETER_INPUT",
+    "TARGET_CLIENT_INITIATION",
+    "UNEXPECTED_INPUT"
 ]
 orderErrStr = Literal[
     "UNKNOWN_ORDER_ERR",
@@ -22,10 +26,11 @@ accountErrStr = Literal[
     "INSUFFICIENT_BALANCE",
 ]
 
+
 # Base exception
 class HermesBaseException(Exception):
     errCode         : int
-    errStr          : genericErrStr | orderErrStr | accountErrStr
+    errStr          : Union[genericErrStr, orderErrStr, accountErrStr]
 
 
 #
@@ -85,6 +90,14 @@ class UnexpectedOutputType(HermesBaseException):
 class UnsupportedParameterValue(HermesBaseException):
     errCode     = 1012
     errStr      = "UNSUPPORTED_PARAMETER_INPUT"
+
+class TargetClientInitiationError(HermesBaseException):
+    errCode     = 1013
+    errStr      = "TARGET_CLIENT_INITIATION"
+
+class UnexpectedInput(HermesBaseException):
+    errCode     = 1014
+    errStr      = "UNEXPECTED_INPUT"
 
 #
 # Order errors 
