@@ -2,7 +2,7 @@
 
 
 from abc import ABC, abstractmethod
-from hermesConnector.hermesExceptions import InsufficientParameters
+from hermesConnector.hermes_exceptions import InsufficientParameters
 from datetime import datetime
 import typing_extensions as typing
 from typing import Optional, Any, Callable, Union

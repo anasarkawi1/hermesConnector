@@ -9,7 +9,7 @@ from dateutil.relativedelta import relativedelta
 from datetime import timezone
 from typing import Union, Dict, Tuple
 
-from .hermesExceptions import InsufficientParameters, HandlerNonExistent, NonStandardInput, TargetClientInitiationError, UnexpectedInput, UnexpectedOutputType, UnknownGenericHermesException, UnsupportedFeature, UnsupportedParameterValue
+from .hermes_exceptions import InsufficientParameters, HandlerNonExistent, NonStandardInput, TargetClientInitiationError, UnexpectedInput, UnexpectedOutputType, UnknownGenericHermesException, UnsupportedFeature, UnsupportedParameterValue
 from .connector_template import ConnectorTemplate
 
 # Alpaca Imports

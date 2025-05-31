@@ -10,7 +10,7 @@ import pandas as pd
 from pandas import DataFrame, concat
 import numpy as np
 import json
-from .hermesExceptions import  HermesBaseException, InsufficientParameters, UnknownGenericHermesException, GenericOrderError, InsufficientBalance
+from .hermes_exceptions import  HermesBaseException, InsufficientParameters, UnknownGenericHermesException, GenericOrderError, InsufficientBalance
 
 
 # Notes:
