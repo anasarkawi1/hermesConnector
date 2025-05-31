@@ -9,12 +9,13 @@ from typing import Optional, Any, Callable, Union
 
 from hermesConnector.models import BaseOrderResult, ClockReturnModel, MarketOrderQtyParams, MarketOrderResult
 from hermesConnector.models_utilities import HermesBaseModel
-from hermes_enums import Timeframe
+from hermesConnector.timeframe import TimeFrame
+from hermes_enums import TimeframeUnit
 
 
 class ConnectorOptions(HermesBaseModel):
     tradingPair         : str
-    interval            : Timeframe
+    interval            : TimeFrame
     limit               : Union[str, int]
     mode                : str
     columns             : Optional[Any]

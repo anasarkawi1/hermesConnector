@@ -39,7 +39,7 @@ class OrderStatus(str, Enum):
     CALCULATED              = "calculated"
     HELD                    = "held"
 
-class Timeframe(str, Enum):
+class TimeframeUnit(str, Enum):
     WEEK                    = "week"
     DAY                     = "day"
     HOUR                    = "hour"

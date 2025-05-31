@@ -15,7 +15,8 @@ genericErrStr = Literal[
     "UNEXPECTED_OUTPUT_TYPE",
     "UNSUPPORTED_PARAMETER_INPUT",
     "TARGET_CLIENT_INITIATION",
-    "UNEXPECTED_INPUT"
+    "UNEXPECTED_INPUT",
+    "UNSUPPORTED_FEATURE"
 ]
 orderErrStr = Literal[
     "UNKNOWN_ORDER_ERR",
@@ -98,6 +99,10 @@ class TargetClientInitiationError(HermesBaseException):
 class UnexpectedInput(HermesBaseException):
     errCode     = 1014
     errStr      = "UNEXPECTED_INPUT"
+
+class UnsupportedFeature(HermesBaseException):
+    errCode     = 1015
+    errStr      = "UNSUPPORTED_FEATURE"
 
 #
 # Order errors 

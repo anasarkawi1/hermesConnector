@@ -9,7 +9,7 @@ from dateutil.relativedelta import relativedelta
 from datetime import timezone
 from typing import Union, Dict, Tuple
 
-from .hermesExceptions import InsufficientParameters, HandlerNonExistent, NonStandardInput, TargetClientInitiationError, UnexpectedInput, UnexpectedOutputType, UnknownGenericHermesException, UnsupportedParameterValue
+from .hermesExceptions import InsufficientParameters, HandlerNonExistent, NonStandardInput, TargetClientInitiationError, UnexpectedInput, UnexpectedOutputType, UnknownGenericHermesException, UnsupportedFeature, UnsupportedParameterValue
 from .connector_template import ConnectorTemplate
 
 # Alpaca Imports
@@ -31,7 +31,8 @@ from alpaca.data import StockBarsRequest, OptionBarsRequest, CryptoBarsRequest, 
 from .models import BaseOrderResult, ClockReturnModel, LimitOrderBaseParams, LimitOrderResult, LiveMarketData, OrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
 
 # TODO: Tidy this up. Put all the imports inside a single reference instead of individual imports
-from .hermes_enums import TimeInForce as HermesTIF, OrderSide as HermesOrderSide, OrderStatus as HermesOrderStatus, Timeframe as HermesTimeframe
+from .hermes_enums import TimeInForce as HermesTIF, OrderSide as HermesOrderSide, OrderStatus as HermesOrderStatus, TimeframeUnit as HermesTimeframeUnit
+from .timeframe import TimeFrame as HermesTimeFrame
 
 
 
@@ -118,6 +119,7 @@ class Alpaca(ConnectorTemplate):
         
         # Populate the clients dictionary and request data model fields
         self.clients["historical"] = historicDataClient
+        self._historicalDataClient = historicDataClient
         self.historicalDataRequestModel = historicalDataRequestModel
         # Check if a data handler was supplied. Else, don't assign the real time client
         if self.options.dataHandler != None:
@@ -127,6 +129,9 @@ class Alpaca(ConnectorTemplate):
         # Declare a start date for historical data
         # The date is way back in the past (30 years by default) to allow for the limit parameter to take priority
         self._historicalDataStartDate = datetime.now() - timedelta(weeks=(52 * 30))
+
+        # Convert Hermes timeframe to Alpaca timeframe
+        self._requestAlpacaTimeFrame = self._convertTimeFrame(self.options.interval)
     
     def exchangeClock(self) -> ClockReturnModel:
         currentTime: Union[AlpacaClock, AlpacaRawData] = self._tradingClient.get_clock()
@@ -513,19 +518,32 @@ class Alpaca(ConnectorTemplate):
             raise UnexpectedOutputType
         return output
     
-    def _convertTimeFrame(self, timeframe: HermesTimeframe) -> AlpacaTimeFrame:
+    def _convertTimeFrame(
+            self,
+            timeframe: HermesTimeFrame) -> AlpacaTimeFrame:
         # TODO: Completely wrong, needs to be fixed. Currently, it tries to give the unit only, but also it retrieves that though the Alpaca's TimeFrame class, which by default yields an amount of 1 unit.
-        match timeframe:
-            case HermesTimeframe.WEEK:
-                return AlpacaTimeFrame.Week
-            case HermesTimeframe.DAY:
-                return AlpacaTimeFrame.Day
-            case HermesTimeframe.HOUR:
-                return AlpacaTimeFrame.Hour
-            case HermesTimeframe.MINUTE:
-                return AlpacaTimeFrame.Minute
+        tf = None
+        match timeframe.unit:
+            case HermesTimeframeUnit.WEEK:
+                tf = AlpacaTimeFrame(
+                    amount=timeframe.amount,
+                    unit=AlpacaTimeFrameUnit.Week)
+            case HermesTimeframeUnit.DAY:
+                tf = AlpacaTimeFrame(
+                    amount=timeframe.amount,
+                    unit=AlpacaTimeFrameUnit.Day)
+            case HermesTimeframeUnit.HOUR:
+                tf = AlpacaTimeFrame(
+                    amount=timeframe.amount,
+                    unit=AlpacaTimeFrameUnit.Hour)
+            case HermesTimeframeUnit.MINUTE:
+                tf = AlpacaTimeFrame(
+                    amount=timeframe.amount,
+                    unit=AlpacaTimeFrameUnit.Minute)
             case _:
                 raise NonStandardInput
+        
+        return tf
 
     def _endDateConverter(self, startDate: datetime, tf: AlpacaTimeFrame):
         endDate = None
@@ -547,45 +565,48 @@ class Alpaca(ConnectorTemplate):
         endDate = startDate + offsetDelta
         if endDate != None:
             return endDate
+        else:
+            raise UnexpectedOutputType
     
     def _rollingFuncCloseTimeConverter(self, startDate):
-        return self._endDateConverter(startDate=startDate, tf=self.__requestAlpacaTimeFrame)
+        return self._endDateConverter(
+            startDate=startDate,
+            tf=self._requestAlpacaTimeFrame)
 
     def historicData(self):
         rawBarsResponse: None | AlpacaBarSet | AlpacaRawData = None
-        reqTimeframe = self._convertTimeFrame(self.options.interval)
-        self._requestAlpacaTimeFrame = reqTimeframe
         reqStartDate = self._historicalDataStartDate
 
         # Construct and initiate data request
+        # The asset classes are cheked through the match-case, so the type checker warning are suppressed.
         match self._assetClass:
             case AlpacaTradingEnums.AssetClass.US_EQUITY:
                 reqModel = StockBarsRequest(
                     symbol_or_symbols=self.options.tradingPair,
-                    timeframe=reqTimeframe,
+                    timeframe=self._requestAlpacaTimeFrame,
                     start=reqStartDate,
                     limit=int(self.options.limit))
-                rawBarsResponse = self.clients["historical"].get_stock_bars(reqModel)
+                rawBarsResponse = self._historicalDataClient.get_stock_bars(reqModel) # type: ignore
                 # Do something here
             case AlpacaTradingEnums.AssetClass.US_OPTION:
                 reqModel = OptionBarsRequest(
                     symbol_or_symbols=self.options.tradingPair,
-                    timeframe=reqTimeframe,
+                    timeframe=self._requestAlpacaTimeFrame,
                     start=reqStartDate,
                     limit=int(self.options.limit))
-                rawBarsResponse = self.clients["historical"].get_option_bars(reqModel)
+                rawBarsResponse = self._historicalDataClient.get_option_bars(reqModel) # type: ignore
             case AlpacaTradingEnums.AssetClass.CRYPTO:
                 reqModel = CryptoBarsRequest(
                     symbol_or_symbols=self.options.tradingPair,
-                    timeframe=reqTimeframe,
+                    timeframe=self._requestAlpacaTimeFrame,
                     start=reqStartDate,
                     limit=int(self.options.limit))
-                rawBarsResponse = self.clients["historical"].get_crypto_bars(reqModel)
+                rawBarsResponse = self._historicalDataClient.get_crypto_bars(reqModel) # type: ignore
             case _:
                 raise NonStandardInput
         
         # Process the recieved data
-        if (isinstance(rawBarsResponse, AlpacaBarSet) != True) or (isinstance(rawBarsResponse, AlpacaRawData)):
+        if (isinstance(rawBarsResponse, AlpacaBarSet) != True) or (isinstance(rawBarsResponse, Dict)):
             raise UnexpectedOutputType
         
         # Convert BarSet to a pandas DataFrame and process it
@@ -607,7 +628,7 @@ class Alpaca(ConnectorTemplate):
             "timestamp": "openTime"
         }, inplace=True)
         # Calculate percent change of the close prices
-        rawDataFrame["pChange"] = (rawDataFrame["close"].pct_change) * 100
+        rawDataFrame["pChange"] = (rawDataFrame["close"].pct_change()) * 100
 
         # Generate closing times through the open times
         # Problem: Alpaca doesn't return closing times. Thus, we need to take the opening times and add the offset of the candlestick
@@ -619,34 +640,39 @@ class Alpaca(ConnectorTemplate):
 
     def initiateLiveData(self):
         # Check if an handler was provided
-        if (self.clients["ws"] == None):
+        if (self._wsClient == None):
             # Handler not found, raise an exception
             raise HandlerNonExistent
         
         # Configure WS client
-        self.clients["ws"].subscribe_bars(
-            self.wsHandlerInternal,
+        if (self._assetClass == AlpacaTradingEnums.AssetClass.US_OPTION):
+            raise UnsupportedFeature
+        
+        self._wsClient.subscribe_bars( # type: ignore
+            self.wsHandlerInternal, # type: ignore      # TODO: Raw data is not being recieved, the input type should be fine. However, the edge case should be handled in any case.
             self.options.tradingPair)
         
         # Start WS client
-        self.clients["ws"].run()
+        self._wsClient.run()
 
     def wsHandlerInternal(self, data: Bar) -> None:
         # Calculate epoch for the open time
         openTimeEpoch = (data.timestamp.replace(tzinfo=timezone.utc).timestamp() * 1000)
 
         # Calculate epoch for the close time        
-        closeTime = self._endDateConverter(startDate=data.timestamp, tf=self._requestAlpacaTimeFrame)
+        closeTime = self._endDateConverter(
+            startDate=data.timestamp,
+            tf=self._requestAlpacaTimeFrame)
         closeTimeEpoch = (closeTime.replace(tzinfo=timezone.utc).timestamp() * 1000)
         
         formattedBar: LiveMarketData = LiveMarketData(
             openTime=openTimeEpoch,
-            openPrice=data,
-            highPrice=data,
-            lowPrice=data,
-            closePrice=data,
+            openPrice=data.open,
+            highPrice=data.high,
+            lowPrice=data.low,
+            closePrice=data.close,
             closeTime=closeTimeEpoch,
-            volume=data)
+            volume=data.volume)
         
         # TODO: Determine if the current candlestick is new
         # Check the last recorded timestamp against the newly recieved one. If the newly recieved one is higher, a new candlestick had opened.
@@ -655,4 +681,5 @@ class Alpaca(ConnectorTemplate):
             candlestickOpened = True
         self._lastLiveTimestamp = openTimeEpoch
         
-        self.options["dataHandler"](data=formattedBar, closed=candlestickOpened)
+        if self.options.dataHandler != None:
+            self.options.dataHandler(data=formattedBar, closed=candlestickOpened)
