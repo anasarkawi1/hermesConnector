@@ -10,7 +10,6 @@ from typing import Optional, Any, Callable, Union
 from hermesConnector.models import BaseOrderResult, ClockReturnModel, MarketOrderQtyParams, MarketOrderResult
 from hermesConnector.models_utilities import HermesBaseModel
 from hermesConnector.timeframe import TimeFrame
-from hermes_enums import TimeframeUnit
 
 
 class ConnectorOptions(HermesBaseModel):

@@ -6,6 +6,7 @@ __all__ = ["connector_template", "connector_binance", "connector_alpaca"]
 
 
 # Own module import
+from hermesConnector.hermes_exceptions import UnsupportedExchange
 from .connector_alpaca import Alpaca
 from .connector_binance import Binance
 
@@ -22,15 +23,6 @@ class Connector:
             options):
         exchangeInstance = None
         match exchange:
-            case "binance":
-                exchangeInstance = Binance(
-                    mode=options["mode"],
-                    tradingPair=options["tradingPair"],
-                    interval=options["interval"],
-                    limit=options["limit"],
-                    credentials=credentials,
-                    wshandler=options["dataHandler"],
-                    columns=options["columns"])
             case "alpaca":
                 exchangeInstance = Alpaca(
                     mode=options["mode"],
@@ -42,7 +34,7 @@ class Connector:
                     columns=options["columns"])
             case _:
                 # TODO: Change this to an exception
-                return "EXCHANGE_INVALID"
+                raise UnsupportedExchange
             
         return exchangeInstance
 
