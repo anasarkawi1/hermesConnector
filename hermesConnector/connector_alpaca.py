@@ -133,17 +133,23 @@ class Alpaca(ConnectorTemplate):
         # Convert Hermes timeframe to Alpaca timeframe
         self._requestAlpacaTimeFrame = self._convertTimeFrame(self.options.interval)
     
-    def exchangeClock(self) -> ClockReturnModel:
-        currentTime: Union[AlpacaClock, AlpacaRawData] = self._tradingClient.get_clock()
+    def _exchangeClock_request(self) -> Union[AlpacaClock, AlpacaRawData]:
+        return self._tradingClient.get_clock()
+    
+    def _exchangeClock_internal(self, input) -> ClockReturnModel:
         # To appease the Pylance, check if the type is of Dict, the base type for Alpaca's RawData type.
-        if (isinstance(currentTime, Dict)):
+        if (isinstance(input, Dict)):
             raise UnexpectedOutputType
         else:
             return ClockReturnModel(
-                isOpen=currentTime.is_open,
-                nextOpen=currentTime.next_open,
-                nextClose=currentTime.next_close,
-                currentTimestamp=currentTime.timestamp)
+                isOpen=input.is_open,
+                nextOpen=input.next_open,
+                nextClose=input.next_close,
+                currentTimestamp=input.timestamp)
+        
+    def exchangeClock(self) -> ClockReturnModel:
+        input = self._exchangeClock_request()
+        return self._exchangeClock_internal(input=input)
 
     def stop(self) -> None:
         self._wsClient.stop()
