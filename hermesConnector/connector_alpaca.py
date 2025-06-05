@@ -31,7 +31,7 @@ from alpaca.data import StockBarsRequest, OptionBarsRequest, CryptoBarsRequest, 
 from .models import BaseOrderResult, ClockReturnModel, LimitOrderBaseParams, LimitOrderResult, LiveMarketData, OrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
 
 # TODO: Tidy this up. Put all the imports inside a single reference instead of individual imports
-from .hermes_enums import TimeInForce as HermesTIF, OrderSide as HermesOrderSide, OrderStatus as HermesOrderStatus, TimeframeUnit as HermesTimeframeUnit
+from .hermes_enums import OrderType, TimeInForce as HermesTIF, OrderSide as HermesOrderSide, OrderStatus as HermesOrderStatus, TimeframeUnit as HermesTimeframeUnit
 from .timeframe import TimeFrame as HermesTimeFrame
 
 
@@ -243,13 +243,21 @@ class Alpaca(ConnectorTemplate):
             # Generate output
             if (
                 orderResult.qty                     == None or
-                orderResult.filled_qty              == None or
-                orderResult.filled_avg_price        == None or
                 orderResult.type                    == None or
                 orderResult.time_in_force           == None or
                 orderResult.status                  == None
                 ):
                 raise UnexpectedOutputType
+            
+            filled_qty          = None
+            filled_avg_price    = None
+            if (
+                type(orderResult.filled_qty)          == None or
+                type(orderResult.filled_avg_price)    == None
+            ):
+                filled_qty          = float(orderResult.filled_qty) # type: ignore
+                filled_avg_price    = float(orderResult.filled_avg_price) # type: ignore
+
             output = MarketOrderResult(
                 order_id            = str(orderResult.id),
                 created_at          = orderResult.created_at,
@@ -264,13 +272,13 @@ class Alpaca(ConnectorTemplate):
                 symbol              = orderResult.symbol,
                 notional            = orderResult.notional,
                 qty                 = float(orderResult.qty),
-                filled_qty          = float(orderResult.filled_qty),
-                filled_avg_price    = float(orderResult.filled_avg_price),
+                filled_qty          = filled_qty,
+                filled_avg_price    = filled_avg_price,
                 # Enums
                 side                = orderSideResult,
-                type                = str(orderResult.type),
-                time_in_force       = str(orderResult.time_in_force),
-                status              = str(orderResult.status),
+                type                = OrderType(orderResult.type),
+                time_in_force       = HermesTIF(orderResult.time_in_force),
+                status              = HermesOrderStatus(orderResult.status),
                 # Raw response as a json string
                 raw                 = jsonStr)
             
@@ -278,8 +286,9 @@ class Alpaca(ConnectorTemplate):
             return output
         except APIError as err:
             raise err
+    
 
-
+    @generalErrorHandlerDecorator
     def marketOrderQty(
             self,
             orderParams: MarketOrderQtyParams) -> MarketOrderResult:
@@ -354,9 +363,9 @@ class Alpaca(ConnectorTemplate):
                 filled_avg_price    = float(orderResult.filled_avg_price),
                 # Enums
                 side                = orderSideResult,
-                type                = str(orderResult.type),
-                time_in_force       = str(orderResult.time_in_force),
-                status              = str(orderResult.status),
+                type                = OrderType(orderResult.type),
+                time_in_force       = HermesTIF(orderResult.time_in_force),
+                status              = HermesOrderStatus(orderResult.status),
                 # Limit order specific
                 limit_price         = float(orderResult.limit_price),
                 # Raw response as a json string
@@ -423,9 +432,9 @@ class Alpaca(ConnectorTemplate):
                 filled_avg_price    = float(queriedOrder.filled_avg_price),
                 # Enums
                 side                = orderSideResult,
-                type                = str(queriedOrder.type),
-                time_in_force       = str(queriedOrder.time_in_force),
-                status              = str(queriedOrder.status),
+                type                = OrderType(queriedOrder.type),
+                time_in_force       = HermesTIF(queriedOrder.time_in_force),
+                status              = HermesOrderStatus(queriedOrder.status),
                 # Raw response as a json string
                 raw                 = jsonStr)
         
@@ -489,9 +498,9 @@ class Alpaca(ConnectorTemplate):
                 filled_avg_price    = float(order.filled_avg_price),
                 # Enums
                 side                = orderSideResult,
-                type                = str(order.type),
-                time_in_force       = str(order.time_in_force),
-                status              = str(order.status),
+                type                = OrderType(order.type),
+                time_in_force       = HermesTIF(order.time_in_force),
+                status              = HermesOrderStatus(order.status),
                 # Raw response as a json string
                 raw                 = jsonStr)
     

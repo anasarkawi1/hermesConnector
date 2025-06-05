@@ -5,8 +5,10 @@
 # Import Hermes Library
 import pytest
 from hermesConnector import Connector
+from hermesConnector.models import MarketOrderQtyParams
 from hermesConnector.timeframe import TimeFrame
-from hermesConnector.hermes_enums import TimeframeUnit
+from hermesConnector.hermes_enums import OrderStatus, OrderType, TimeframeUnit, OrderSide, TimeInForce
+from hermesConnector.connector_alpaca import Alpaca
 
 
 # Import libraries
@@ -15,6 +17,7 @@ import sys
 from dotenv import load_dotenv
 from datetime import datetime
 import warnings
+import json
 
 
 # Add Hermes source into sys.path to be access later on
@@ -66,8 +69,38 @@ def test_exchangeClock(exchange):
     assert isinstance(clock.nextClose, datetime)
     assert isinstance(clock.currentTimestamp, datetime)
 
-def test_marketOrderQty():
-    pass
+def test_marketOrderQty(exchange: Alpaca):
+    '''
+        Tests for the desired behaviour of `marketOrderQty` method, with the assumption that a correct input was given.
+
+        To be checked:
+            1. Is the raw JSON string preserved in the output
+    '''
+    orderParams = MarketOrderQtyParams(
+        side=OrderSide.BUY,
+        tif=TimeInForce.DAY,
+        qty=1)
+    
+    # Submit order
+    order = exchange.marketOrderQty(orderParams=orderParams)
+
+    # Check Hermes Enum fields
+    assert isinstance(order.side, OrderSide)
+    assert isinstance(order.type, OrderType)
+    assert isinstance(order.status, OrderStatus)
+    
+    rawJSON = order.raw
+
+    # Check if the field is even populated at all
+    assert len(rawJSON) > 0
+
+    # Check if the JSON is valid, if not raise AssertionError
+    try:
+        json.loads(rawJSON)
+    except json.JSONDecodeError:
+        raise AssertionError
+    except UnicodeDecodeError:
+        raise AssertionError
 
 def test_marketOrderCost():
     pass

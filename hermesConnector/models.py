@@ -53,11 +53,10 @@ class BaseOrderResult(HermesBaseModel):
     qty                         : Optional[float]
     filled_qty                  : Optional[float]
     filled_avg_price            : Optional[float]
-    type                        : Optional[Union[OrderType, str]]
-    side                        : Optional[Union[OrderSide, str]]
-    time_in_force               : Optional[Union[TimeInForce, str]]
-    status                      : Optional[Union[OrderStatus, str]]
-    limit_price                 : Optional[float] = None
+    type                        : Optional[OrderType]
+    side                        : Optional[OrderSide]
+    time_in_force               : Optional[TimeInForce]
+    status                      : Optional[OrderStatus]
 
     # Raw exchange response as a JSON string. Used for archival and redundancy reasons.
     raw                         : str
@@ -67,7 +66,7 @@ class MarketOrderResult(BaseOrderResult):
     pass
 
 class LimitOrderResult(BaseOrderResult):
-    pass
+    limit_price                 : Optional[float] = None
 
 
 #
