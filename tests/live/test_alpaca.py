@@ -73,7 +73,7 @@ def test_marketOrderCost():
 def test_limitOrder():
     pass
 
-def test_queryOrder()    :
+def test_queryOrder():
     pass
 
 def test_cancelOrder():

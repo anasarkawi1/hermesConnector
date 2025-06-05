@@ -132,6 +132,18 @@ class Alpaca(ConnectorTemplate):
 
         # Convert Hermes timeframe to Alpaca timeframe
         self._requestAlpacaTimeFrame = self._convertTimeFrame(self.options.interval)
+
+    @staticmethod
+    def generalErrorHandlerDecorator(func):
+        def wrapper_generalErrorHandlerDecorator(self, *args, **kwargs):
+            '''
+                Decorator used for 
+            '''
+            try:
+                return func(self, *args, **kwargs)
+            except Exception as e:
+                raise e
+        return wrapper_generalErrorHandlerDecorator
     
     def _exchangeClock_request(self) -> Union[AlpacaClock, AlpacaRawData]:
         return self._tradingClient.get_clock()
@@ -146,7 +158,8 @@ class Alpaca(ConnectorTemplate):
                 nextOpen=input.next_open,
                 nextClose=input.next_close,
                 currentTimestamp=input.timestamp)
-        
+    
+    @generalErrorHandlerDecorator
     def exchangeClock(self) -> ClockReturnModel:
         input = self._exchangeClock_request()
         return self._exchangeClock_internal(input=input)
@@ -518,6 +531,7 @@ class Alpaca(ConnectorTemplate):
         return output
     
     # TODO: Should this be a standard method for all connectors, instead of a private utility method?
+    @generalErrorHandlerDecorator
     def _getAssetInfo(self, assetNameOrId) -> AlpacaAsset:
         output = self._tradingClient.get_asset(symbol_or_asset_id=assetNameOrId)
         if (isinstance(output, Dict)):
