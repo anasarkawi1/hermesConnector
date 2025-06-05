@@ -3,6 +3,7 @@
 
 
 # Import Hermes Library
+import pytest
 from hermesConnector import Connector
 from hermesConnector.timeframe import TimeFrame
 from hermesConnector.hermes_enums import TimeframeUnit
@@ -31,7 +32,9 @@ tradingPair = 'AAPL'
 tf = TimeFrame(1, TimeframeUnit.DAY)
 limit = "100"
 
-def getClient():
+
+@pytest.fixture
+def exchange():
     exchange = Connector(
     exchange='alpaca',
     credentials=credentials,
@@ -54,8 +57,7 @@ def getClient():
 def test_generalTest():
     warnings.warn("There are no general tests implemented yet. General tests meant to test cases common to all methods should be looked into (None inputs etc.)")
 
-def test_exchangeClock():
-    exchange = getClient()
+def test_exchangeClock(exchange):
     clock = exchange.exchangeClock()
 
     # Check for the property types
