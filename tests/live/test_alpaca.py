@@ -11,6 +11,8 @@ from hermesConnector.connector_alpaca import Alpaca
 
 # Import Alpaca Modules
 from alpaca.data.requests import StockLatestQuoteRequest
+from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.enums import OrderSide as AlpacaOrderSide, TimeInForce as AlpacaTIF
 
 # Import libraries
 import os
@@ -19,6 +21,7 @@ from dotenv import load_dotenv
 from datetime import datetime
 import warnings
 import json
+from pprint import pprint
 
 
 # Add Hermes source into sys.path to be access later on
@@ -146,8 +149,25 @@ def test_limitOrder(exchange: Alpaca):
     # test order
     orderFieldsCommonTests(order=order)
 
-def test_queryOrder():
-    pass
+
+def test_queryOrder(exchange: Alpaca):
+    # positions = exchange._tradingClient.get_open_position(symbol_or_asset_id=tradingPair)
+    # currentPosition = float(positions.qty) # type: ignore
+    #
+    # For testing pruposes, place an order directly
+    # orderReq = MarketOrderRequest(
+    #    symbol=tradingPair,
+    #    qty=currentPosition,
+    #    side=AlpacaOrderSide.SELL,
+    #    time_in_force=AlpacaTIF.DAY)
+    # 
+    # order = exchange._tradingClient.submit_order(orderReq)
+
+    orderId = '9bb6d467-4610-44cc-ba09-b287aed4c141'
+    order = exchange.queryOrder(orderId=orderId)
+
+    orderFieldsCommonTests(order=order)
+
 
 def test_cancelOrder():
     pass

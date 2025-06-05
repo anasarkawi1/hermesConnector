@@ -435,17 +435,30 @@ class Alpaca(ConnectorTemplate):
 
         # Format order data into a model
         if (
-                queriedOrder.qty                     == None or
-                queriedOrder.filled_qty              == None or
-                queriedOrder.filled_avg_price        == None or
                 queriedOrder.type                    == None or
                 queriedOrder.time_in_force           == None or
-                queriedOrder.status                  == None or
-                queriedOrder.limit_price             == None
+                queriedOrder.status                  == None
                 ):
                 raise UnexpectedOutputType
+        
+        filled_qty          = None
+        filled_avg_price    = None
+        if(
+            queriedOrder.filled_qty         != None and
+            queriedOrder.filled_avg_price   != None
+        ):
+            filled_qty          = float(queriedOrder.filled_qty)
+            filled_avg_price    = float(queriedOrder.filled_avg_price)
+        
+        notional = None
+        if (queriedOrder.notional != None):
+            notional = float(queriedOrder.notional)
+        qty = None
+        if (queriedOrder.qty != None):
+            qty = float(queriedOrder.qty)
+
         outputModel = BaseOrderResult(
-                order_id                = str(queriedOrder.id),
+                order_id            = str(queriedOrder.id),
                 created_at          = queriedOrder.created_at,
                 updated_at          = queriedOrder.updated_at,
                 submitted_at        = queriedOrder.submitted_at,
@@ -456,10 +469,10 @@ class Alpaca(ConnectorTemplate):
                 failed_at           = queriedOrder.failed_at,
                 asset_id            = str(queriedOrder.asset_id),
                 symbol              = queriedOrder.symbol,
-                notional            = queriedOrder.notional,
-                qty                 = float(queriedOrder.qty),
-                filled_qty          = float(queriedOrder.filled_qty),
-                filled_avg_price    = float(queriedOrder.filled_avg_price),
+                notional            = notional,
+                qty                 = qty,
+                filled_qty          = filled_qty,
+                filled_avg_price    = filled_avg_price,
                 # Enums
                 side                = orderSideResult,
                 type                = OrderType(queriedOrder.type),
