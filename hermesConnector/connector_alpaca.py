@@ -4,6 +4,7 @@
 
 # Load modules
 from datetime import datetime, timedelta
+import warnings
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 from datetime import timezone
@@ -241,8 +242,8 @@ class Alpaca(ConnectorTemplate):
             orderSideResult = self._orderSideMatcher(orderResult.side)
 
             # Generate output
+            # TODO: Are these checks even remotely needed?
             if (
-                orderResult.qty                     == None or
                 orderResult.type                    == None or
                 orderResult.time_in_force           == None or
                 orderResult.status                  == None
@@ -257,6 +258,14 @@ class Alpaca(ConnectorTemplate):
             ):
                 filled_qty          = float(orderResult.filled_qty) # type: ignore
                 filled_avg_price    = float(orderResult.filled_avg_price) # type: ignore
+            
+            qty = None
+            if (orderResult.qty != None):
+                qty = float(orderResult.qty)
+            
+            notional = None
+            if (orderResult.notional != None):
+                notional = float(orderResult.notional)
 
             output = MarketOrderResult(
                 order_id            = str(orderResult.id),
@@ -270,8 +279,8 @@ class Alpaca(ConnectorTemplate):
                 failed_at           = orderResult.failed_at,
                 asset_id            = str(orderResult.asset_id),
                 symbol              = orderResult.symbol,
-                notional            = orderResult.notional,
-                qty                 = float(orderResult.qty),
+                notional            = notional,
+                qty                 = qty,
                 filled_qty          = filled_qty,
                 filled_avg_price    = filled_avg_price,
                 # Enums
@@ -304,6 +313,7 @@ class Alpaca(ConnectorTemplate):
         
         return self._marketOrderSubmit(reqModel=reqModel)
     
+    @generalErrorHandlerDecorator
     def marketOrderCost(
             self,
             orderParams: MarketOrderNotionalParams) -> MarketOrderResult:

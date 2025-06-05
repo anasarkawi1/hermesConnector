@@ -5,7 +5,7 @@
 # Import Hermes Library
 import pytest
 from hermesConnector import Connector
-from hermesConnector.models import MarketOrderQtyParams
+from hermesConnector.models import BaseOrderResult, MarketOrderNotionalParams, MarketOrderQtyParams
 from hermesConnector.timeframe import TimeFrame
 from hermesConnector.hermes_enums import OrderStatus, OrderType, TimeframeUnit, OrderSide, TimeInForce
 from hermesConnector.connector_alpaca import Alpaca
@@ -69,21 +69,8 @@ def test_exchangeClock(exchange):
     assert isinstance(clock.nextClose, datetime)
     assert isinstance(clock.currentTimestamp, datetime)
 
-def test_marketOrderQty(exchange: Alpaca):
-    '''
-        Tests for the desired behaviour of `marketOrderQty` method, with the assumption that a correct input was given.
 
-        To be checked:
-            1. Is the raw JSON string preserved in the output
-    '''
-    orderParams = MarketOrderQtyParams(
-        side=OrderSide.BUY,
-        tif=TimeInForce.DAY,
-        qty=1)
-    
-    # Submit order
-    order = exchange.marketOrderQty(orderParams=orderParams)
-
+def orderFieldsCommonTests(order: BaseOrderResult):
     # Check Hermes Enum fields
     assert isinstance(order.side, OrderSide)
     assert isinstance(order.type, OrderType)
@@ -102,8 +89,38 @@ def test_marketOrderQty(exchange: Alpaca):
     except UnicodeDecodeError:
         raise AssertionError
 
-def test_marketOrderCost():
-    pass
+def test_marketOrderQty(exchange: Alpaca):
+    '''
+        Tests for the desired behaviour of `marketOrderQty` method, with the assumption that a correct input was given.
+    '''
+
+    # TODO: add cases for other `OrderSide` and `TimeInForce` parameters
+
+    orderParams = MarketOrderQtyParams(
+        side=OrderSide.BUY,
+        tif=TimeInForce.DAY,
+        qty=1)
+    
+    # Submit order
+    order = exchange.marketOrderQty(orderParams=orderParams)
+
+    # Test order return
+    orderFieldsCommonTests(order=order)
+
+
+def test_marketOrderCost(exchange: Alpaca):
+    
+    # TODO: The cost here could lead to fractional orders, which could be rejected. Elaborate on testing here, for now, this is sufficient.
+    orderParams = MarketOrderNotionalParams(
+        side=OrderSide.BUY,
+        tif=TimeInForce.DAY,
+        cost=2000)
+    
+    # Submit order
+    order = exchange.marketOrderCost(orderParams=orderParams)
+
+    # Test order result
+    orderFieldsCommonTests(order=order)
 
 def test_limitOrder():
     pass

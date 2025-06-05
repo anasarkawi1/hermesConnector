@@ -49,7 +49,7 @@ class BaseOrderResult(HermesBaseModel):
     failed_at                   : Optional[datetime]
     asset_id                    : Optional[str]
     symbol                      : Optional[str]
-    notional                    : Optional[str]
+    notional                    : Optional[float]
     qty                         : Optional[float]
     filled_qty                  : Optional[float]
     filled_avg_price            : Optional[float]
