@@ -1,15 +1,16 @@
 # Hermes Test Scripts
 # By Anas Arkawi, 2025.
 
-
 # Import Hermes Library
 import pytest
 from hermesConnector import Connector
-from hermesConnector.models import BaseOrderResult, MarketOrderNotionalParams, MarketOrderQtyParams
+from hermesConnector.models import BaseOrderResult, LimitOrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams
 from hermesConnector.timeframe import TimeFrame
 from hermesConnector.hermes_enums import OrderStatus, OrderType, TimeframeUnit, OrderSide, TimeInForce
 from hermesConnector.connector_alpaca import Alpaca
 
+# Import Alpaca Modules
+from alpaca.data.requests import StockLatestQuoteRequest
 
 # Import libraries
 import os
@@ -122,8 +123,28 @@ def test_marketOrderCost(exchange: Alpaca):
     # Test order result
     orderFieldsCommonTests(order=order)
 
-def test_limitOrder():
-    pass
+
+def test_limitOrder(exchange: Alpaca):
+
+    # For testing purposes retrieve the latest price directly
+    quoteReqParams = StockLatestQuoteRequest(
+        symbol_or_symbols=tradingPair)
+    latestQuote = exchange._historicalDataClient.get_stock_latest_quote(quoteReqParams) # type: ignore
+
+    latestAskPrice = float(latestQuote[tradingPair].ask_price)
+    limitPrice = latestAskPrice - 10
+
+    orderParams = LimitOrderBaseParams(
+        side=OrderSide.BUY,
+        tif=TimeInForce.DAY,
+        qty=1,
+        limitPrice=limitPrice)
+    
+    # Submit order
+    order = exchange.limitOrder(orderParams=orderParams)
+
+    # test order
+    orderFieldsCommonTests(order=order)
 
 def test_queryOrder():
     pass
@@ -141,7 +162,13 @@ def test_historicData():
     pass
 
 def test_initiateLiveData():
+    '''
+        Note: Live data tests are currently done by hand.
+    '''
     pass
 
 def test_wsHandlerInternal():
+    '''
+        Note: Live data tests are currently done by hand.
+    '''
     pass

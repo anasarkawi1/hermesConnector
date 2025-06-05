@@ -253,11 +253,11 @@ class Alpaca(ConnectorTemplate):
             filled_qty          = None
             filled_avg_price    = None
             if (
-                type(orderResult.filled_qty)          == None or
-                type(orderResult.filled_avg_price)    == None
+                orderResult.filled_qty          != None and
+                orderResult.filled_avg_price    != None
             ):
-                filled_qty          = float(orderResult.filled_qty) # type: ignore
-                filled_avg_price    = float(orderResult.filled_avg_price) # type: ignore
+                filled_qty          = float(orderResult.filled_qty)
+                filled_avg_price    = float(orderResult.filled_avg_price)
             
             qty = None
             if (orderResult.qty != None):
@@ -347,14 +347,32 @@ class Alpaca(ConnectorTemplate):
             # TODO: Make the result for the order (probably similar to the market order.)
             if (
                 orderResult.qty                     == None or
-                orderResult.filled_qty              == None or
-                orderResult.filled_avg_price        == None or
                 orderResult.type                    == None or
                 orderResult.time_in_force           == None or
                 orderResult.status                  == None or
                 orderResult.limit_price             == None
                 ):
                 raise UnexpectedOutputType
+            
+
+            # Check if there's any fill data, if so process accordingly
+            filled_qty          = None
+            filled_avg_price    = None
+            if (
+                orderResult.filled_qty          != None and
+                orderResult.filled_avg_price    != None):
+                filled_qty          = float(orderResult.filled_qty)
+                filled_avg_price    = float(orderResult.filled_avg_price)
+            
+            # Process notional and quantity fields
+            notional = None
+            if (orderResult.notional != None):
+                notional = float(orderResult.notional)
+            qty = None
+            if (orderResult.qty != None):
+                qty = float(orderResult.qty)
+
+
             output = LimitOrderResult(
                 order_id            = str(orderResult.id),
                 created_at          = orderResult.created_at,
@@ -367,10 +385,10 @@ class Alpaca(ConnectorTemplate):
                 failed_at           = orderResult.failed_at,
                 asset_id            = str(orderResult.asset_id),
                 symbol              = orderResult.symbol,
-                notional            = orderResult.notional,
-                qty                 = float(orderResult.qty),
-                filled_qty          = float(orderResult.filled_qty),
-                filled_avg_price    = float(orderResult.filled_avg_price),
+                notional            = notional,
+                qty                 = qty,
+                filled_qty          = filled_qty,
+                filled_avg_price    = filled_avg_price,
                 # Enums
                 side                = orderSideResult,
                 type                = OrderType(orderResult.type),
@@ -383,7 +401,8 @@ class Alpaca(ConnectorTemplate):
             return output
         except APIError as err:
             raise err
-
+    
+    @generalErrorHandlerDecorator
     def limitOrder(
             self,
             orderParams: LimitOrderBaseParams):
@@ -394,6 +413,7 @@ class Alpaca(ConnectorTemplate):
         reqModel = LimitOrderRequest(
             symbol=self.options.tradingPair,
             qty=orderParams.qty,
+            limit_price=orderParams.limitPrice,
             side=orderSideEnum,
             time_in_force=tifEnum)
         
