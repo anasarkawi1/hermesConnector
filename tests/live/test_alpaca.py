@@ -12,8 +12,9 @@ from hermesConnector.connector_alpaca import Alpaca
 
 # Import Alpaca Modules
 from alpaca.data.requests import StockLatestQuoteRequest
-from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
 from alpaca.trading.enums import OrderSide as AlpacaOrderSide, TimeInForce as AlpacaTIF, OrderStatus as AlpacaOrderStatus
+from alpaca.trading.models import Order as AlpacaOrder
 
 # Import libraries
 import os
@@ -99,23 +100,6 @@ def cleanUpOrder(exchange, testOrderId, testOrderSide):
         exchange._tradingClient.cancel_order_by_id(testOrderId)
 
 
-#
-# Tests
-#
-
-def test_generalTest():
-    warnings.warn("There are no general tests implemented yet. General tests meant to test cases common to all methods should be looked into (None inputs etc.)")
-
-def test_exchangeClock(exchange):
-    clock = exchange.exchangeClock()
-
-    # Check for the property types
-    assert ((clock.isOpen == True) or (clock.isOpen == False))
-    assert isinstance(clock.nextOpen, datetime)
-    assert isinstance(clock.nextClose, datetime)
-    assert isinstance(clock.currentTimestamp, datetime)
-
-
 def orderFieldsCommonTests(order: BaseOrderResult):
     # Check Hermes Enum fields
     assert isinstance(order.side, OrderSide)
@@ -134,6 +118,23 @@ def orderFieldsCommonTests(order: BaseOrderResult):
         raise AssertionError
     except UnicodeDecodeError:
         raise AssertionError
+
+
+#
+# Tests
+#
+
+def test_generalTest():
+    warnings.warn("There are no general tests implemented yet. General tests meant to test cases common to all methods should be looked into (None inputs etc.)")
+
+def test_exchangeClock(exchange):
+    clock = exchange.exchangeClock()
+
+    # Check for the property types
+    assert ((clock.isOpen == True) or (clock.isOpen == False))
+    assert isinstance(clock.nextOpen, datetime)
+    assert isinstance(clock.nextClose, datetime)
+    assert isinstance(clock.currentTimestamp, datetime)
 
 def test_marketOrderQty(exchange: Alpaca):
     '''
@@ -264,11 +265,75 @@ def test_cancelOrder(exchange: Alpaca):
         assert queriedOrder.status == AlpacaOrderStatus.CANCELED
     
 
-def test_currentOrder():
-    pass
+def test_currentOrders(exchange: Alpaca):
 
-def test_getAllOrders():
-    pass
+    # For testing purposes retrieve the latest price directly
+    quoteReqParams = StockLatestQuoteRequest(
+        symbol_or_symbols=tradingPair)
+    latestQuote = exchange._historicalDataClient.get_stock_latest_quote(quoteReqParams) # type: ignore
+
+    latestAskPrice = float(latestQuote[tradingPair].ask_price)
+
+    testOrdersSide = AlpacaOrderSide.BUY
+    limitPrices = [
+        (latestAskPrice - 40),
+        (latestAskPrice - 30),
+        (latestAskPrice - 20),
+        ]
+    
+    while (limitPrices[0] <= 0):
+        limitPrices.pop(0)
+
+    # Get the current number of open orders before proceeding
+    alreadyOpenOrders = exchange._tradingClient.get_orders()
+    alreadyOpenOrdersNum = len(alreadyOpenOrders)
+    
+    submittedOrders: list[AlpacaOrder] = []
+    for price in limitPrices:
+        orderReq = LimitOrderRequest(
+            symbol=tradingPair,
+            qty=1,
+            limit_price=price,
+            side=testOrdersSide,
+            time_in_force=AlpacaTIF.DAY)
+        order = exchange._tradingClient.submit_order(orderReq)
+        if (isinstance(order, Dict)):
+            raise TypeError
+        submittedOrders.append(order)
+    
+    # currentPositions = exchange._tradingClient.get_orders()
+    currentPositions = exchange.currentOrders()
+
+    # Print diagnostic information
+    print(f"Already Open Orders: {alreadyOpenOrdersNum}")
+    print(f"Created Open Orders: {len(limitPrices)}")
+    print(f"Recieved Open Orders: {len(currentPositions)}")
+
+    # Perform tests on the request itself
+    assert (len(limitPrices) + alreadyOpenOrdersNum) == len(currentPositions)
+
+    # Perform tests on the individual orders
+    for recvOrder in currentPositions:
+        orderFieldsCommonTests(recvOrder)
+    
+    # Clean up orders
+    for order in submittedOrders:
+        orderId = order.id
+        orderSide = order.side
+        cleanUpOrder(exchange, orderId, orderSide)
+
+def test_getAllOrders(exchange: Alpaca):
+    cancelResult = exchange._tradingClient.cancel_orders()
+    print(cancelResult)
+
+    orders = exchange._tradingClient.get_orders()
+    if (isinstance(orders, Dict)):
+        raise ValueError
+    
+    for order in orders:
+        print(f'Limit Price: {order.limit_price}')
+
+    print(len(orders))
 
 def test_historicData():
     pass

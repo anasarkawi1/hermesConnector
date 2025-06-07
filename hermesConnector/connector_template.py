@@ -117,7 +117,7 @@ class ConnectorTemplate(ABC):
         pass
     
     @abstractmethod
-    def currentOrder(self):
+    def currentOrders(self):
         pass
     
     @abstractmethod

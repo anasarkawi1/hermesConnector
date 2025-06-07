@@ -503,6 +503,7 @@ class Alpaca(ConnectorTemplate):
         self._tradingClient.cancel_order_by_id(order_id=orderId)
         return True
     
+    # TODO: Why not use this for all of the methods?
     def _orderToModel(self, order: AlpacaOrder) -> BaseOrderResult:
         # Convert AlpacaOrder to JSON string
         jsonStr = order.model_dump_json()
@@ -514,17 +515,31 @@ class Alpaca(ConnectorTemplate):
 
         # Format order data into a model
         if (
-                order.qty                     == None or
-                order.filled_qty              == None or
-                order.filled_avg_price        == None or
                 order.type                    == None or
                 order.time_in_force           == None or
-                order.status                  == None or
-                order.limit_price             == None
+                order.status                  == None
                 ):
                 raise UnexpectedOutputType
+        
+        filled_qty          = None
+        filled_avg_price    = None
+        if (
+            order.filled_qty            != None and
+            order.filled_avg_price      != None
+        ):
+            filled_qty          = float(order.filled_qty)
+            filled_avg_price    = float(order.filled_avg_price)
+
+        notional = None
+        if (order.notional != None):
+            notional = float(order.notional)
+        
+        qty = None
+        if (order.qty != None):
+            qty = float(order.qty)
+        
         return BaseOrderResult(
-                order_id                = str(order.id),
+                order_id            = str(order.id),
                 created_at          = order.created_at,
                 updated_at          = order.updated_at,
                 submitted_at        = order.submitted_at,
@@ -535,10 +550,10 @@ class Alpaca(ConnectorTemplate):
                 failed_at           = order.failed_at,
                 asset_id            = str(order.asset_id),
                 symbol              = order.symbol,
-                notional            = order.notional,
-                qty                 = float(order.qty),
-                filled_qty          = float(order.filled_qty),
-                filled_avg_price    = float(order.filled_avg_price),
+                notional            = notional,
+                qty                 = qty,
+                filled_qty          = filled_qty,
+                filled_avg_price    = filled_avg_price,
                 # Enums
                 side                = orderSideResult,
                 type                = OrderType(order.type),
@@ -552,7 +567,7 @@ class Alpaca(ConnectorTemplate):
             raise UnexpectedOutputType
         return self._orderToModel(currentOrder)
 
-    def currentOrder(self) -> list[BaseOrderResult]:
+    def currentOrders(self) -> list[BaseOrderResult]:
         # Filter for open orders and orders of the current symbol only
         queryFilters = GetOrdersRequest(
             status=AlpacaTradingEnums.QueryOrderStatus.OPEN,
