@@ -2,6 +2,7 @@
 # By Anas Arkawi, 2025.
 
 # Import Hermes Library
+from typing import Dict
 import pytest
 from hermesConnector import Connector
 from hermesConnector.models import BaseOrderResult, LimitOrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams
@@ -55,6 +56,47 @@ def exchange():
     }).exchange
 
     return exchange
+
+
+#
+# Utilities
+#
+
+def cleanUpOrder(exchange, testOrderId, testOrderSide):
+    currentOrder = exchange._tradingClient.get_order_by_id(order_id=testOrderId)
+    if (isinstance(currentOrder, Dict)):
+        raise TypeError
+    
+    # Check if the order was partially filled, if so, submit an order against the filled amount
+    if (currentOrder.status == OrderStatus.FILLED) or (currentOrder.status == OrderStatus.PARTIALLY_FILLED):
+        # Process the quantity of filled portion of the test order
+        filledQty = None
+        if (currentOrder.filled_qty == None):
+            raise ValueError
+        else:
+            filledQty = float(currentOrder.filled_qty)
+
+        # Determine the opposite side of the trade
+        cleanUpOrderSide = None
+        if (testOrderSide == AlpacaOrderSide.BUY):
+            cleanUpOrderSide = AlpacaOrderSide.SELL
+        elif (testOrderSide == AlpacaOrderSide.SELL):
+            cleanUpOrderSide = AlpacaOrderSide.BUY
+        else:
+            raise ValueError
+        
+
+        # Construct and submit the order
+        cleanUpOrderReq = MarketOrderRequest(
+            symbol=tradingPair,
+            qty=filledQty,
+            side=cleanUpOrderSide,
+            time_in_force=AlpacaTIF.DAY)
+        cleanUpOrder = exchange._tradingClient.submit_order(cleanUpOrderReq)
+    
+    # The order was not filled, try to cancel it.
+    else:
+        exchange._tradingClient.cancel_order_by_id(testOrderId)
 
 
 #
@@ -136,9 +178,10 @@ def test_limitOrder(exchange: Alpaca):
 
     latestAskPrice = float(latestQuote[tradingPair].ask_price)
     limitPrice = latestAskPrice - 10
+    testOrderSide = OrderSide.BUY
 
     orderParams = LimitOrderBaseParams(
-        side=OrderSide.BUY,
+        side=testOrderSide,
         tif=TimeInForce.DAY,
         qty=1,
         limitPrice=limitPrice)
@@ -149,24 +192,39 @@ def test_limitOrder(exchange: Alpaca):
     # test order
     orderFieldsCommonTests(order=order)
 
+    # Clean up order
+    cleanUpOrder(
+        exchange=exchange,
+        testOrderId=order.order_id,
+        testOrderSide=testOrderSide)
+
 
 def test_queryOrder(exchange: Alpaca):
-    # positions = exchange._tradingClient.get_open_position(symbol_or_asset_id=tradingPair)
-    # currentPosition = float(positions.qty) # type: ignore
-    #
+    
     # For testing pruposes, place an order directly
-    # orderReq = MarketOrderRequest(
-    #    symbol=tradingPair,
-    #    qty=currentPosition,
-    #    side=AlpacaOrderSide.SELL,
-    #    time_in_force=AlpacaTIF.DAY)
-    # 
-    # order = exchange._tradingClient.submit_order(orderReq)
+    testOrderSide = AlpacaOrderSide.BUY
+    testOrderReq = MarketOrderRequest(
+       symbol=tradingPair,
+       qty=1,
+       side=testOrderSide,
+       time_in_force=AlpacaTIF.DAY)
+    
+    order = exchange._tradingClient.submit_order(testOrderReq)
 
-    orderId = '9bb6d467-4610-44cc-ba09-b287aed4c141'
-    order = exchange.queryOrder(orderId=orderId)
+    # Check if raw data was returned
+    if (isinstance(order, Dict)):
+        raise TypeError
+
+    testOrderId = str(order.id)
+    order = exchange.queryOrder(orderId=testOrderId)
 
     orderFieldsCommonTests(order=order)
+
+    # Cleanup, cancel order or resell asset
+    cleanUpOrder(
+        exchange=exchange,
+        testOrderId=testOrderId,
+        testOrderSide=testOrderSide)
 
 
 def test_cancelOrder():
