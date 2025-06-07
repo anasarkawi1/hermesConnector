@@ -12,8 +12,8 @@ from hermesConnector.connector_alpaca import Alpaca
 
 # Import Alpaca Modules
 from alpaca.data.requests import StockLatestQuoteRequest
-from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest
-from alpaca.trading.enums import OrderSide as AlpacaOrderSide, TimeInForce as AlpacaTIF, OrderStatus as AlpacaOrderStatus
+from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest, GetOrdersRequest
+from alpaca.trading.enums import OrderSide as AlpacaOrderSide, TimeInForce as AlpacaTIF, OrderStatus as AlpacaOrderStatus, QueryOrderStatus as AlpacaQueryOrderStatus
 from alpaca.trading.models import Order as AlpacaOrder
 
 # Import libraries
@@ -323,6 +323,91 @@ def test_currentOrders(exchange: Alpaca):
         cleanUpOrder(exchange, orderId, orderSide)
 
 def test_getAllOrders(exchange: Alpaca):
+    # TODO: Implement the same tests as the `currentOrders` in addition to orders that would be filled, etc.
+
+    # For testing purposes retrieve the latest price directly
+    quoteReqParams = StockLatestQuoteRequest(
+        symbol_or_symbols=tradingPair)
+    latestQuote = exchange._historicalDataClient.get_stock_latest_quote(quoteReqParams) # type: ignore
+
+    latestAskPrice = float(latestQuote[tradingPair].ask_price)
+    testOrdersSide = AlpacaOrderSide.BUY
+    submittedOrders: list[AlpacaOrder] = []
+
+    # Get the current number of orders before proceeding
+    existingOrdersReq = GetOrdersRequest(
+        status=AlpacaQueryOrderStatus.ALL,
+        symbols=[tradingPair])
+    existingOrders = exchange._tradingClient.get_orders(filter=existingOrdersReq)
+
+    # This is irrelevant for this test as the max number of orders is 500. Non-open orders can be way past that
+    existingOrdersNum = len(existingOrders)
+
+    #
+    # Prepare the Market order
+    #
+    marketOrderReq = MarketOrderRequest(
+        symbol=tradingPair,
+        qty=1,
+        side=AlpacaOrderSide.BUY,
+        time_in_force=AlpacaTIF.DAY)
+    marketOrder = exchange._tradingClient.submit_order(marketOrderReq)
+    if (isinstance(marketOrder, Dict)):
+        raise TypeError
+    submittedOrders.append(marketOrder)
+
+    #
+    # Prepare the limit orders
+    #
+
+    limitPrices = [
+        (latestAskPrice - 40),
+        (latestAskPrice - 30),
+        (latestAskPrice - 20)
+        ]
+    
+    # If all prices are invalid, an IndexError will be thrown.
+    while (limitPrices[0] <= 0):
+        limitPrices.pop(0)
+
+    
+    for price in limitPrices:
+        orderReq = LimitOrderRequest(
+            symbol=tradingPair,
+            qty=1,
+            limit_price=price,
+            side=testOrdersSide,
+            time_in_force=AlpacaTIF.DAY)
+        order = exchange._tradingClient.submit_order(orderReq)
+        if (isinstance(order, Dict)):
+            raise TypeError
+        submittedOrders.append(order)
+    
+    # currentPositions = exchange._tradingClient.get_orders()
+    currentPositions = exchange.getAllOrders()
+
+    # Print diagnostic information
+    orderPairs = [
+        (currentPositions[3].order_id, str(submittedOrders[0].id)),
+        (currentPositions[2].order_id, str(submittedOrders[1].id)),
+        (currentPositions[1].order_id, str(submittedOrders[2].id)),
+        (currentPositions[0].order_id, str(submittedOrders[3].id))
+        ]
+
+    for pair in orderPairs:
+        assert pair[0] == pair[1]
+
+    # Perform tests on the individual orders
+    for recvOrder in currentPositions:
+        orderFieldsCommonTests(recvOrder)
+    
+    # Clean up orders
+    for order in submittedOrders:
+        orderId = order.id
+        orderSide = order.side
+        cleanUpOrder(exchange, orderId, orderSide)
+
+def test_historicData(exchange: Alpaca):
     cancelResult = exchange._tradingClient.cancel_orders()
     print(cancelResult)
 
@@ -335,14 +420,12 @@ def test_getAllOrders(exchange: Alpaca):
 
     print(len(orders))
 
-def test_historicData():
-    pass
-
-def test_initiateLiveData():
+def test_initiateLiveData(exchange: Alpaca):
     '''
         Note: Live data tests are currently done by hand.
     '''
-    pass
+    result = exchange._tradingClient.cancel_orders()
+    print(result)
 
 def test_wsHandlerInternal():
     '''
