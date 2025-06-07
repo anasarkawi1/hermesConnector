@@ -408,6 +408,9 @@ def test_getAllOrders(exchange: Alpaca):
         cleanUpOrder(exchange, orderId, orderSide)
 
 def test_historicData(exchange: Alpaca):
+    pass
+
+def test_utility(exchange: Alpaca):
     cancelResult = exchange._tradingClient.cancel_orders()
     print(cancelResult)
 
@@ -419,6 +422,7 @@ def test_historicData(exchange: Alpaca):
         print(f'Limit Price: {order.limit_price}')
 
     print(len(orders))
+    pass
 
 def test_initiateLiveData(exchange: Alpaca):
     '''
