@@ -13,7 +13,7 @@ from hermesConnector.connector_alpaca import Alpaca
 # Import Alpaca Modules
 from alpaca.data.requests import StockLatestQuoteRequest
 from alpaca.trading.requests import MarketOrderRequest
-from alpaca.trading.enums import OrderSide as AlpacaOrderSide, TimeInForce as AlpacaTIF
+from alpaca.trading.enums import OrderSide as AlpacaOrderSide, TimeInForce as AlpacaTIF, OrderStatus as AlpacaOrderStatus
 
 # Import libraries
 import os
@@ -68,7 +68,7 @@ def cleanUpOrder(exchange, testOrderId, testOrderSide):
         raise TypeError
     
     # Check if the order was partially filled, if so, submit an order against the filled amount
-    if (currentOrder.status == OrderStatus.FILLED) or (currentOrder.status == OrderStatus.PARTIALLY_FILLED):
+    if (currentOrder.status == AlpacaOrderStatus.FILLED) or (currentOrder.status == AlpacaOrderStatus.PARTIALLY_FILLED):
         # Process the quantity of filled portion of the test order
         filledQty = None
         if (currentOrder.filled_qty == None):
@@ -227,8 +227,42 @@ def test_queryOrder(exchange: Alpaca):
         testOrderSide=testOrderSide)
 
 
-def test_cancelOrder():
-    pass
+def test_cancelOrder(exchange: Alpaca):
+    # 1. Create a test order.
+    # 2. Cancel the order through Hermes.
+    # 3. Check the order status through the Alpaca API directly.
+
+    # Create and submit test order
+    testOrderSide = AlpacaOrderSide.BUY
+    testOrderReq = MarketOrderRequest(
+        symbol=tradingPair,
+        qty=1,
+        side=testOrderSide,
+        time_in_force=AlpacaTIF.DAY)
+    
+    testOrder = exchange._tradingClient.submit_order(testOrderReq)
+    if (isinstance(testOrder, Dict)):
+        raise ValueError
+
+
+    # Attempt to cancel the order through Hermes
+    testOrderId = str(testOrder.id)
+    result = exchange.cancelOrder(testOrderId)
+
+    # Order cancellation failed due to the order status. Confirm the status and continue
+    if (result == False):
+        assert testOrder.status == AlpacaOrderStatus.CANCELED
+        assert testOrder.status == AlpacaOrderStatus.FILLED
+        assert testOrder.status == AlpacaOrderStatus.EXPIRED
+    else:
+        # Confirm order details
+        queriedOrder = exchange._tradingClient.get_order_by_id(testOrderId)
+        if (isinstance(queriedOrder, Dict)):
+            raise ValueError
+        
+        # Check if the order is in fact cancelled
+        assert queriedOrder.status == AlpacaOrderStatus.CANCELED
+    
 
 def test_currentOrder():
     pass
