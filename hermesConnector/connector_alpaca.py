@@ -137,11 +137,12 @@ class Alpaca(ConnectorTemplate):
     def generalErrorHandlerDecorator(func):
         def wrapper_generalErrorHandlerDecorator(self, *args, **kwargs):
             '''
-                Decorator used for 
+                Decorator used for handling of general errors.
             '''
             try:
                 return func(self, *args, **kwargs)
             except Exception as e:
+                # TODO: Implement a user-defined callback for error logging.
                 raise e
         return wrapper_generalErrorHandlerDecorator
     
@@ -163,10 +164,12 @@ class Alpaca(ConnectorTemplate):
     def exchangeClock(self) -> ClockReturnModel:
         input = self._exchangeClock_request()
         return self._exchangeClock_internal(input=input)
-
+    
+    @generalErrorHandlerDecorator
     def stop(self) -> None:
         self._wsClient.stop()
 
+    @generalErrorHandlerDecorator
     def account(self):
         pass
 
@@ -404,7 +407,7 @@ class Alpaca(ConnectorTemplate):
     @generalErrorHandlerDecorator
     def limitOrder(
             self,
-            orderParams: LimitOrderBaseParams):
+            orderParams: LimitOrderBaseParams) -> LimitOrderResult:
         
         orderSideEnum, tifEnum = self._orderParamConstructor(orderParams=orderParams)
 
@@ -417,7 +420,8 @@ class Alpaca(ConnectorTemplate):
             time_in_force=tifEnum)
         
         return self._limitOrderSubmit(reqModel=reqModel)
-
+    
+    @generalErrorHandlerDecorator
     def queryOrder(self, orderId: str) -> BaseOrderResult:
         # Query order
         queriedOrder = self._tradingClient.get_order_by_id(order_id=orderId)
@@ -482,7 +486,8 @@ class Alpaca(ConnectorTemplate):
         
         # Return model
         return outputModel
-
+    
+    @generalErrorHandlerDecorator
     def cancelOrder(self, orderId: str) -> bool:
         # Query order
         targetOrder = self.queryOrder(orderId=orderId)
@@ -580,7 +585,8 @@ class Alpaca(ConnectorTemplate):
 
         # Return formatted list
         return output
-
+    
+    @generalErrorHandlerDecorator
     def getAllOrders(self) -> list[BaseOrderResult]:
         # Filter for open orders and orders of the current symbol only
         queryFilters = GetOrdersRequest(
@@ -658,7 +664,8 @@ class Alpaca(ConnectorTemplate):
         return self._endDateConverter(
             startDate=startDate,
             tf=self._requestAlpacaTimeFrame)
-
+    
+    @generalErrorHandlerDecorator
     def historicData(self) -> DataFrame:
         rawBarsResponse: None | AlpacaBarSet | AlpacaRawData = None
         reqStartDate = self._historicalDataStartDate
@@ -727,8 +734,9 @@ class Alpaca(ConnectorTemplate):
         
         
         return rawDataFrame
+    
 
-
+    @generalErrorHandlerDecorator
     def initiateLiveData(self):
         # Check if an handler was provided
         if (self._wsClient == None):
@@ -746,6 +754,8 @@ class Alpaca(ConnectorTemplate):
         # Start WS client
         self._wsClient.run()
 
+    
+    @generalErrorHandlerDecorator
     def wsHandlerInternal(self, data: Bar) -> None:
         # Calculate epoch for the open time
         openTimeEpoch = (data.timestamp.replace(tzinfo=timezone.utc).timestamp() * 1000)

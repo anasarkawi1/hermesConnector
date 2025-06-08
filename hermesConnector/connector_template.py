@@ -2,12 +2,14 @@
 
 
 from abc import ABC, abstractmethod
+
+from pandas import DataFrame
 from hermesConnector.hermes_exceptions import InsufficientParameters
 from datetime import datetime
 import typing_extensions as typing
 from typing import Optional, Any, Callable, Union
 
-from hermesConnector.models import BaseOrderResult, ClockReturnModel, MarketOrderQtyParams, MarketOrderResult
+from hermesConnector.models import BaseOrderResult, ClockReturnModel, LimitOrderBaseParams, LimitOrderResult, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
 from hermesConnector.models_utilities import HermesBaseModel
 from hermesConnector.timeframe import TimeFrame
 
@@ -88,16 +90,48 @@ class ConnectorTemplate(ABC):
         pass
 
     @abstractmethod
-    def marketOrderCost(self):
+    def marketOrderCost(
+        self,
+        orderParams: MarketOrderNotionalParams) -> MarketOrderResult:
+        """
+            Submits a market order based on the notional value of the order's base asset.
+            
+            Parameters
+            ----------
+            orderParams: MarketOrderNotionalParams
+                Order parameters and input as a HermesBaseModel.
+
+            Returns
+            -------
+            MarketOrderReturn
+                Return of the exchange response, standardised as a HermesBaseModel.
+        """
         pass
     
     @abstractmethod
-    def limitOrder(self):
+    def limitOrder(
+        self,
+        orderParams: LimitOrderBaseParams) -> LimitOrderResult:
+        """
+            Submits a limit order based on the quantity of the base asset.
+            
+            Parameters
+            ----------
+            orderParams: LimitOrderBaseParams
+                Order parameters and input as a HermesBaseModel.
+
+            Returns
+            -------
+            LimitOrderReturn
+                Return of the exchange response, standardised as a HermesBaseModel.
+        """
         pass
 
     # TODO: Determine the outpur type
     @abstractmethod
-    def queryOrder(self, orderId: str) -> BaseOrderResult:
+    def queryOrder(
+        self,
+        orderId: str) -> BaseOrderResult:
         """
             Queries a submitted order by the order ID.
 
@@ -113,23 +147,65 @@ class ConnectorTemplate(ABC):
         pass
     
     @abstractmethod
-    def cancelOrder(self):
+    def cancelOrder(
+        self,
+        orderId: str) -> bool:
+        """
+            Cancels the order with the given `orderId`.
+            
+            Parameters
+            ----------
+            orderId: str
+                ID of the order to be cancelled.
+
+            Returns
+            -------
+            boolean
+                Returns `True` if the cancellation was a success, `False` if the cancellation failed, but not due to a failure.
+        """
         pass
     
     @abstractmethod
-    def currentOrders(self):
+    def currentOrders(self) -> list[BaseOrderResult]:
+        """
+            Returns a list of the currently open orders.
+
+            Returns
+            -------
+            list[BaseOrderResult]
+                List of the currently open orders
+        """
         pass
     
     @abstractmethod
     def getAllOrders(self):
+        """
+            Returns a list of the last 50 submitted orders, open or otherwise.
+
+            Returns
+            -------
+            list[BaseOrderResult]
+                List of the last 50 submitted orders, open or otherwise.
+        """
         pass
     
     @abstractmethod
-    def historicData(self):
+    def historicData(self) -> DataFrame:
+        """
+            Requests, formats, and returns a Pandas Dataframe of the price data of the selected asset.
+
+            The DataFrame contains the following columns:
+                `['openTime', 'open', 'high', 'low', 'close', 'volume', 'pChange', 'closeTime']`
+            
+            Returns
+            -------
+            DataFrame
+                A Pandas DataFrame of the price data of the asset.
+        """
         pass
     
     @abstractmethod
-    def initiateLiveData(self):
+    def initiateLiveData(self) -> None:
         pass
 
     @abstractmethod
