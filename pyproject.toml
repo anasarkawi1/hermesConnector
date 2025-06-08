@@ -17,7 +17,8 @@ dependencies = [
     "pandas",
     "dataclasses",
     "binance-connector",
-    "alpaca-py"
+    "alpaca-py",
+    "pydantic"
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
