@@ -1,3 +1,6 @@
+# type: ignore
+# Deprecated file, ignore type checking.
+
 # Connector library for Binance Public API.
 # By Anas Arkawi, 2023.
 
