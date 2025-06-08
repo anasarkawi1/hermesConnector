@@ -2,7 +2,7 @@
 # By Anas Arkawi, 2023.
 
 
-__all__ = ["connector_template", "connector_binance", "connector_alpaca"]
+__all__ = ["connector_template", "connector_binance", "connector_alpaca"]       # type: ignore
 
 
 # Own module import
@@ -33,7 +33,6 @@ class Connector:
                     wshandler=options["dataHandler"],
                     columns=options["columns"])
             case _:
-                # TODO: Change this to an exception
                 raise UnsupportedExchange
             
         return exchangeInstance

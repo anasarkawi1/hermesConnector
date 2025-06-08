@@ -2,8 +2,6 @@
 # By Anas Arkawi, 2025.
 
 # Import Hermes Library
-from typing import Dict
-import pytest
 from hermesConnector import Connector
 from hermesConnector.models import BaseOrderResult, LimitOrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams
 from hermesConnector.timeframe import TimeFrame
@@ -17,6 +15,8 @@ from alpaca.trading.enums import OrderSide as AlpacaOrderSide, TimeInForce as Al
 from alpaca.trading.models import Order as AlpacaOrder
 
 # Import libraries
+import pytest
+from typing import Dict
 import os
 import sys
 from dotenv import load_dotenv
@@ -27,7 +27,7 @@ from pprint import pprint
 from pandas import DataFrame
 
 
-# Add Hermes source into sys.path to be access later on
+# Add Hermes source into sys.path to be accessed later on
 cwd = os.getcwd()
 sys.path.append(cwd)
 
@@ -41,23 +41,6 @@ mode = 'live'
 tradingPair = 'AAPL'
 tf = TimeFrame(1, TimeframeUnit.DAY)
 dataPointsLimit = "100"
-
-
-@pytest.fixture
-def exchange():
-    exchange = Connector(
-    exchange='alpaca',
-    credentials=credentials,
-    options={
-        "mode": mode,
-        "tradingPair": tradingPair,
-        "interval": tf,
-        "limit": dataPointsLimit,
-        "columns": None,
-        "dataHandler": lambda _, x, y: None,
-    }).exchange
-
-    return exchange
 
 
 #
@@ -121,6 +104,28 @@ def orderFieldsCommonTests(order: BaseOrderResult):
         raise AssertionError
 
 
+
+#
+# Pytest fixtures
+#
+
+@pytest.fixture
+def exchange():
+    exchange = Connector(
+    exchange='alpaca',
+    credentials=credentials,
+    options={
+        "mode": mode,
+        "tradingPair": tradingPair,
+        "interval": tf,
+        "limit": dataPointsLimit,
+        "columns": None,
+        "dataHandler": lambda _, x, y: None,
+    }).exchange
+
+    return exchange
+
+
 #
 # Tests
 #
@@ -166,11 +171,18 @@ def test_marketOrderQty(exchange: Alpaca):
 
 def test_marketOrderCost(exchange: Alpaca):
     
-    # TODO: The cost here could lead to fractional orders, which could be rejected. Elaborate on testing here, for now, this is sufficient.
+    # For testing purposes retrieve the latest price directly
+    quoteReqParams = StockLatestQuoteRequest(
+        symbol_or_symbols=tradingPair)
+    latestQuote = exchange._historicalDataClient.get_stock_latest_quote(quoteReqParams) # type: ignore
+
+    latestAskPrice = float(latestQuote[tradingPair].ask_price)
+    orderCost = (latestAskPrice * 4)
+
     orderParams = MarketOrderNotionalParams(
         side=OrderSide.BUY,
         tif=TimeInForce.DAY,
-        cost=2000)
+        cost=orderCost)
     
     # Submit order
     order = exchange.marketOrderCost(orderParams=orderParams)
@@ -338,7 +350,6 @@ def test_currentOrders(exchange: Alpaca):
         cleanUpOrder(exchange, orderId, orderSide)
 
 def test_getAllOrders(exchange: Alpaca):
-    # TODO: Implement the same tests as the `currentOrders` in addition to orders that would be filled, etc.
 
     # For testing purposes retrieve the latest price directly
     quoteReqParams = StockLatestQuoteRequest(
@@ -476,7 +487,7 @@ def test_historicData(exchange: Alpaca):
             if (timeDiff != timeDiffRef):
                 # TODO: Testing this is way more complicated than it should be, due to how calendars work...
                 # Weekends, public holidays, and other special dates are edge cases that throw off the time difference alignment, and should be taken into account. For now, the currect tests are more than enough.
-                warnings.warn("Weekends, public holidays, and other special dates are edge cases that throw off the time difference alignment, and should be taken into account. For now, the currect tests are more than enough.")
+                warnings.warn("Weekends, public holidays, and other special dates are edge cases that throw off the time difference alignment, and should be taken into account. For now, the currect tests are sufficient.")
                 # raise ValueError
     
     #

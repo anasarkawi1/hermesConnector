@@ -79,7 +79,6 @@ class Alpaca(ConnectorTemplate):
         else:
             raise TargetClientInitiationError
 
-        # TODO: Implement Stream and HistoricDataClient selection here
         # Get asset info
         assetInfo = self._getAssetInfo(assetNameOrId=self.options.tradingPair)
         self._assetClass = assetInfo.asset_class
@@ -244,7 +243,6 @@ class Alpaca(ConnectorTemplate):
             orderSideResult = self._orderSideMatcher(orderResult.side)
 
             # Generate output
-            # TODO: Are these checks even remotely needed?
             if (
                 orderResult.type                    == None or
                 orderResult.time_in_force           == None or
@@ -613,7 +611,6 @@ class Alpaca(ConnectorTemplate):
     def _convertTimeFrame(
             self,
             timeframe: HermesTimeFrame) -> AlpacaTimeFrame:
-        # TODO: Completely wrong, needs to be fixed. Currently, it tries to give the unit only, but also it retrieves that though the Alpaca's TimeFrame class, which by default yields an amount of 1 unit.
         tf = None
         match timeframe.unit:
             case HermesTimeframeUnit.WEEK:
@@ -710,7 +707,6 @@ class Alpaca(ConnectorTemplate):
         # Drop the `symbol` column
         rawDataFrame.drop("symbol", axis=1, inplace=True)
 
-        # TODO: Convert into the usual hermes format DataFrame
         # Since we already have a DataFrame at hand, it would be pointless to create a new one.
         # Instead, all the extra columns can be dropped, missing ones can be added, and the existing ones can be named properly.
         # It seems like most of the columns are already there and named correctly anyways, with only the pChange column missing.
@@ -756,7 +752,7 @@ class Alpaca(ConnectorTemplate):
 
     
     @generalErrorHandlerDecorator
-    def wsHandlerInternal(self, data: Bar) -> None:
+    async def wsHandlerInternal(self, data: Bar) -> None:
         # Calculate epoch for the open time
         openTimeEpoch = (data.timestamp.replace(tzinfo=timezone.utc).timestamp() * 1000)
 
@@ -775,7 +771,6 @@ class Alpaca(ConnectorTemplate):
             closeTime=closeTimeEpoch,
             volume=data.volume)
         
-        # TODO: Determine if the current candlestick is new
         # Check the last recorded timestamp against the newly recieved one. If the newly recieved one is higher, a new candlestick had opened.
         candlestickOpened = False
         if (self._lastLiveTimestamp < openTimeEpoch):

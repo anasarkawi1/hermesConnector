@@ -127,7 +127,6 @@ class ConnectorTemplate(ABC):
         """
         pass
 
-    # TODO: Determine the outpur type
     @abstractmethod
     def queryOrder(
         self,
