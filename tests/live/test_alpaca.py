@@ -24,6 +24,7 @@ from datetime import datetime
 import warnings
 import json
 from pprint import pprint
+from pandas import DataFrame
 
 
 # Add Hermes source into sys.path to be access later on
@@ -39,7 +40,7 @@ credentials = [os.getenv('ALPACA_PAPER_KEY'), os.getenv('ALPACA_PAPER_SECRET')]
 mode = 'live'
 tradingPair = 'AAPL'
 tf = TimeFrame(1, TimeframeUnit.DAY)
-limit = "100"
+dataPointsLimit = "100"
 
 
 @pytest.fixture
@@ -51,7 +52,7 @@ def exchange():
         "mode": mode,
         "tradingPair": tradingPair,
         "interval": tf,
-        "limit": limit,
+        "limit": dataPointsLimit,
         "columns": None,
         "dataHandler": lambda _, x, y: None,
     }).exchange
@@ -127,6 +128,7 @@ def orderFieldsCommonTests(order: BaseOrderResult):
 def test_generalTest():
     warnings.warn("There are no general tests implemented yet. General tests meant to test cases common to all methods should be looked into (None inputs etc.)")
 
+
 def test_exchangeClock(exchange):
     clock = exchange.exchangeClock()
 
@@ -135,6 +137,7 @@ def test_exchangeClock(exchange):
     assert isinstance(clock.nextOpen, datetime)
     assert isinstance(clock.nextClose, datetime)
     assert isinstance(clock.currentTimestamp, datetime)
+
 
 def test_marketOrderQty(exchange: Alpaca):
     '''
@@ -154,6 +157,12 @@ def test_marketOrderQty(exchange: Alpaca):
     # Test order return
     orderFieldsCommonTests(order=order)
 
+    # Clean up order
+    cleanUpOrder(
+        exchange=exchange,
+        testOrderId=order.order_id,
+        testOrderSide=AlpacaOrderSide.BUY)
+
 
 def test_marketOrderCost(exchange: Alpaca):
     
@@ -168,6 +177,12 @@ def test_marketOrderCost(exchange: Alpaca):
 
     # Test order result
     orderFieldsCommonTests(order=order)
+
+    # Clean up order
+    cleanUpOrder(
+        exchange=exchange,
+        testOrderId=order.order_id,
+        testOrderSide=AlpacaOrderSide.BUY)
 
 
 def test_limitOrder(exchange: Alpaca):
@@ -408,7 +423,74 @@ def test_getAllOrders(exchange: Alpaca):
         cleanUpOrder(exchange, orderId, orderSide)
 
 def test_historicData(exchange: Alpaca):
-    pass
+    # The test checks the following:
+    # 1. If the columns are correct
+    # 2. The size of the DataFrame
+    # 3. Continuity of dates (equal distances apart)
+    # 4. Continuity of last date and n-1 date
+
+    df: DataFrame = exchange.historicData()
+
+    #
+    # 1. Check if the columns are correct
+    # 
+
+    # Define rempalte columns and retrieve the dolumns of the DataFrame
+    templateColumns = ['openTime', 'open', 'high', 'low', 'close', 'volume', 'pChange', 'closeTime']
+    dataFrameColumns = df.columns
+
+    # Check if the number is correct, raise directly if not, without the rest of the checks.
+    if (len(dataFrameColumns) != len(templateColumns)):
+        raise KeyError
+    
+    # Check if the column name is in the template array
+    for column in dataFrameColumns:
+        if (column not in templateColumns):
+            raise KeyError
+    
+    #
+    # 2. Check if the size of the DataFrame is correct
+    #
+
+    dfSize = len(df)
+    dfInputSize = int(dataPointsLimit)
+    if (dfSize != dfInputSize):
+        raise IndexError
+    
+    #
+    # 3. Check the continuity of the dates
+    #
+
+    nPoint          = df.iloc[0]
+    nLeadPoint      = df.iloc[1]
+    timeDiffRef     = nPoint["closeTime"] - nLeadPoint["closeTime"]
+
+    for i in range(len(df)):
+        leadPointIndex = (i + 1)
+        if (leadPointIndex > len(df) - 1):
+            pass
+        else:
+            nPoint          = df.iloc[i]
+            nLeadPoint      = df.iloc[leadPointIndex]
+            timeDiff        = nPoint["closeTime"] - nLeadPoint["closeTime"]
+            if (timeDiff != timeDiffRef):
+                # TODO: Testing this is way more complicated than it should be, due to how calendars work...
+                # Weekends, public holidays, and other special dates are edge cases that throw off the time difference alignment, and should be taken into account. For now, the currect tests are more than enough.
+                warnings.warn("Weekends, public holidays, and other special dates are edge cases that throw off the time difference alignment, and should be taken into account. For now, the currect tests are more than enough.")
+                # raise ValueError
+    
+    #
+    # 4. Check the time difference between indicies of -1 and -2
+    #
+    
+    pointOne        = df.iloc[-1]
+    pointTwo        = df.iloc[-2]
+    pointThree      = df.iloc[-3]
+
+    timeDiffRef     = pointTwo["closeTime"] - pointThree["closeTime"]
+    timeDiff        = pointOne["closeTime"] - pointTwo["closeTime"]
+
+    assert timeDiff == timeDiffRef
 
 def test_utility(exchange: Alpaca):
     cancelResult = exchange._tradingClient.cancel_orders()

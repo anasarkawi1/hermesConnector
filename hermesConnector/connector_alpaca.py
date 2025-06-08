@@ -9,9 +9,7 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 from datetime import timezone
 from typing import Union, Dict, Tuple
-
-from .hermes_exceptions import InsufficientParameters, HandlerNonExistent, NonStandardInput, TargetClientInitiationError, UnexpectedInput, UnexpectedOutputType, UnknownGenericHermesException, UnsupportedFeature, UnsupportedParameterValue
-from .connector_template import ConnectorTemplate
+from pandas import DataFrame
 
 # Alpaca Imports
 from alpaca.trading.client import TradingClient
@@ -30,10 +28,11 @@ from alpaca.data.live import StockDataStream, OptionDataStream, CryptoDataStream
 from alpaca.data import StockBarsRequest, OptionBarsRequest, CryptoBarsRequest, TimeFrame as AlpacaTimeFrame, TimeFrameUnit as AlpacaTimeFrameUnit, BarSet as AlpacaBarSet, RawData as AlpacaRawData
 
 from .models import BaseOrderResult, ClockReturnModel, LimitOrderBaseParams, LimitOrderResult, LiveMarketData, OrderBaseParams, MarketOrderNotionalParams, MarketOrderQtyParams, MarketOrderResult
-
 # TODO: Tidy this up. Put all the imports inside a single reference instead of individual imports
 from .hermes_enums import OrderType, TimeInForce as HermesTIF, OrderSide as HermesOrderSide, OrderStatus as HermesOrderStatus, TimeframeUnit as HermesTimeframeUnit
 from .timeframe import TimeFrame as HermesTimeFrame
+from .hermes_exceptions import InsufficientParameters, HandlerNonExistent, NonStandardInput, TargetClientInitiationError, UnexpectedInput, UnexpectedOutputType, UnknownGenericHermesException, UnsupportedFeature, UnsupportedParameterValue
+from .connector_template import ConnectorTemplate
 
 
 
@@ -660,7 +659,7 @@ class Alpaca(ConnectorTemplate):
             startDate=startDate,
             tf=self._requestAlpacaTimeFrame)
 
-    def historicData(self):
+    def historicData(self) -> DataFrame:
         rawBarsResponse: None | AlpacaBarSet | AlpacaRawData = None
         reqStartDate = self._historicalDataStartDate
 
@@ -700,6 +699,7 @@ class Alpaca(ConnectorTemplate):
         rawDataFrame: pd.DataFrame = rawBarsResponse.df
         # Reset the `symbol` index
         rawDataFrame.reset_index("symbol", inplace=True)
+        rawDataFrame.reset_index("timestamp", inplace=True)
         # Drop the `symbol` column
         rawDataFrame.drop("symbol", axis=1, inplace=True)
 
@@ -723,6 +723,10 @@ class Alpaca(ConnectorTemplate):
         # The n, n+1 appraoch fails in the edgecase when only a single candlestick is available
         # Better solution: Instead of relying on other candlesticks, inputting the Timeframe directly and then using that to generate a `relativedelta` seems to be the most sensible option.
         rawDataFrame["closeTime"] = rawDataFrame["openTime"].apply(self._rollingFuncCloseTimeConverter)
+        
+        
+        
+        return rawDataFrame
 
 
     def initiateLiveData(self):
